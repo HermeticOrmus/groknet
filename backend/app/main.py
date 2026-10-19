@@ -17,4 +17,5 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Groknet", version="0.1.0", lifespan=lifespan)
 app.include_router(api_router)
-app.mount("/mcp", mcp_app)
+# Mounted last and at the root so /mcp is matched exactly; /api routes above win first.
+app.mount("/", mcp_app)

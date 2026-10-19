@@ -32,10 +32,13 @@ def ping() -> dict[str, str]:
 
 
 # Built at module level: mcp.session_manager only exists after this call.
+# Path is /mcp inside this sub-app, which main.py mounts at "/": that way a POST
+# to exactly /mcp is served (a Mount at /mcp would 307-redirect to /mcp/, and MCP
+# clients do not follow redirects on POST).
 # DNS-rebinding protection is off because cloudflared fronts us and the Host
 # header is groknet.eastwood.ai, not 127.0.0.1.
 mcp_app = mcp.streamable_http_app(
-    streamable_http_path="/",
+    streamable_http_path="/mcp",
     json_response=True,
     stateless_http=True,
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
