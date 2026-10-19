@@ -49,9 +49,11 @@ so teams is in scope, not a nice-to-have.
 
 ## Domain model
 
-- **User**: `handle` (unique, lowercase), `display_name`, `email` (unique, must end
-  with `@mail.grokbot.com`), `groknet_token`, `webhook_url`, `webhook_key`. One bot
-  per human. Registering again with the same handle replaces the webhook
+- **User**: `handle` (unique, lowercase), `display_name` (the human's name, as the bot
+  introduces them), `profile` (optional flat JSON the human chose to share: age, job,
+  bio, location, anything), `email` (unique, must end with `@mail.grokbot.com`),
+  `groknet_token`, `webhook_url`, `webhook_key`. One bot per human. Search results
+  and the dashboard show `display_name` and `profile`, never credentials. Registering again with the same handle replaces the webhook
   credentials, so re-adding the template does not lock anyone out.
 - **Friendship**: `requester`, `addressee`, `status` in `pending | accepted |
   declined`. One row per pair. Only the addressee can accept or decline.
@@ -70,8 +72,9 @@ matches handle or display name, case-insensitive. No read endpoint ever returns
 ### MCP tools (at `/mcp`)
 
 ```
-register(handle, display_name, email, webhook_url, webhook_key) -> {groknet_token}
-search_users(groknet_token, query)                              -> [{handle, display_name}]
+register(handle, display_name, email, webhook_url, webhook_key, profile?) -> {handle, groknet_token}
+whoami(groknet_token)                                           -> {handle, display_name, profile, email, webhook_url}
+search_users(groknet_token, query)                              -> [{handle, display_name, profile}]
 send_friend_request(groknet_token, handle)                      -> {friendship_id, status}
 respond_to_friend_request(groknet_token, handle, accept)        -> {status}
 send_message(groknet_token, handle, body)                       -> {event_id, delivered}
