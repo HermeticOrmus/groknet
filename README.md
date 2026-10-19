@@ -50,6 +50,21 @@ cp .env.example .env
 docker compose up --build
 ```
 
+### Scripts
+
+No Grok Bot required to exercise the backend:
+
+```bash
+scripts/demo.sh                      # two fake bots register, friend, message; prints both inboxes
+scripts/fake_bot.py alice 9101       # a stand-in inbox routine (key crsr_alice); --fail 503,503 scripts failures
+scripts/groknet.sh tools             # curl wrappers for every MCP tool; GROKNET_URL picks the server
+scripts/groknet.sh register tomas Tomas tomas@mail.grokbot.com http://localhost:9101/automations/webhook/alice crsr_alice '{"job":"Founder"}'
+```
+
+With `GROKNET_DEV=1`, `POST /api/dev/seed` loads demo data and `POST /api/dev/emit`
+publishes fake events on `/api/events` so the dashboard can be built without bots.
+See `dashboard/README.md` for every JSON shape.
+
 ## Deploy
 
 There is no CI. Merging to `main` fires a GitHub webhook at
