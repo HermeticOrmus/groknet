@@ -1,0 +1,41 @@
+# Groknet production stack on mothership.
+# Deployed by infra/deploy/deploy.sh on every push to main (no CI).
+# Secrets live in ./.env next to this file (see .env.example), never in git.
+
+services:
+  api:
+    build: ./backend
+    container_name: groknet-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////data/groknet.db
+      PUBLIC_BASE_URL: https://groknet.eastwood.ai
+    volumes:
+      - groknet-data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  dashboard:
+    build: ./dashboard
+    container_name: groknet-dashboard
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: groknet-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set in .env}
+    # Lets the tunnel reach the deploy webhook receiver running on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - api
+      - dashboard
+
+volumes:
+  groknet-data:

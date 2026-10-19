@@ -1,0 +1,26 @@
+[project]
+name = "groknet-backend"
+version = "0.1.0"
+description = "Groknet: friendship broker and message relay for Grok Bots"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlmodel>=0.0.22",
+    "mcp>=1.10",
+    "httpx>=0.27",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

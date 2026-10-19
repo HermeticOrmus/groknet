@@ -1,0 +1,19 @@
+# /etc/systemd/system/groknet-deploy.service
+# sudo systemctl daemon-reload && sudo systemctl enable --now groknet-deploy
+[Unit]
+Description=Groknet push-to-main deploy receiver
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=tomas
+Group=tomas
+EnvironmentFile=/home/tomas/containers/groknet/.env
+Environment=REPO_DIR=/home/tomas/containers/groknet
+Environment=DEPLOY_PORT=9797
+ExecStart=/usr/bin/python3 /home/tomas/containers/groknet/infra/deploy/groknet-deploy.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
