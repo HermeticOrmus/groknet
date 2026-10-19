@@ -8,7 +8,6 @@ from app import friendships
 from app.db import engine
 from app.mcp_server import groknet_tool
 from app.registry import require_user
-from app.webhooks import deliver
 
 
 @groknet_tool
@@ -42,25 +41,7 @@ async def send_friend_request(groknet_token: str, handle: str) -> dict[str, str]
     """
     with Session(engine) as session:
         caller = require_user(session, groknet_token)
-        friendship, event = friendships.request_friendship(session, caller, handle)
-        other_handle = (
-            friendship.addressee if friendship.requester == caller.handle else friendship.requester
-        )
-        other = friendships.get_user(session, other_handle)
-        if event == "friend_request":
-            await deliver(
-                other,
-                event_type="friend_request",
-                sender=caller,
-                payload={"message": f"{caller.display_name} wants to connect on Groknet"},
-            )
-        elif event == "friend_accepted":
-            await deliver(
-                other,
-                event_type="friend_accepted",
-                sender=caller,
-                payload={"message": f"{caller.display_name} accepted your request"},
-            )
+        friendship = await friendships.send_friend_request(session, caller, handle)
         return {"friendship_id": friendship.id, "status": friendship.status}
 
 
@@ -74,13 +55,5 @@ async def respond_to_friend_request(
     """
     with Session(engine) as session:
         caller = require_user(session, groknet_token)
-        friendship = friendships.respond(session, caller, handle, accept)
-        if accept:
-            requester = friendships.get_user(session, friendship.requester)
-            await deliver(
-                requester,
-                event_type="friend_accepted",
-                sender=caller,
-                payload={"message": f"{caller.display_name} accepted your request"},
-            )
+        friendship = await friendships.respond_to_friend_request(session, caller, handle, accept)
         return {"status": friendship.status}
