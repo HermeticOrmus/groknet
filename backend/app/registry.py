@@ -29,6 +29,7 @@ def register_user(
     email: str,
     webhook_url: str,
     webhook_key: str,
+    profile: dict | None = None,
 ) -> User:
     if not HANDLE_RE.match(handle):
         raise RegistrationError(
@@ -48,6 +49,7 @@ def register_user(
                 f"handle {handle!r} is already registered with a different email."
             )
         existing.display_name = display_name
+        existing.profile = profile or {}
         existing.webhook_url = webhook_url
         existing.webhook_key = webhook_key
         existing.groknet_token = secrets.token_urlsafe(32)
@@ -59,6 +61,7 @@ def register_user(
             handle=handle,
             display_name=display_name,
             email=email,
+            profile=profile or {},
             groknet_token=secrets.token_urlsafe(32),
             webhook_url=webhook_url,
             webhook_key=webhook_key,

@@ -73,3 +73,24 @@ def test_registration_is_announced_on_the_event_bus(mcp) -> None:
     assert event["type"] == "user_registered"
     assert event["handle"] == "announcer"
     assert "groknet_token" not in event and "webhook_key" not in event
+
+
+def test_register_carries_the_humans_name_and_optional_profile(mcp) -> None:
+    result = mcp.call(
+        "register",
+        **register_args("profiled", display_name="Sofía Reyes"),
+        profile={"age": 34, "job": "Product designer", "bio": "Builds tools for small teams."},
+    )
+
+    me = mcp.call("whoami", groknet_token=result["groknet_token"])
+    assert me["display_name"] == "Sofía Reyes"
+    assert me["profile"] == {
+        "age": 34,
+        "job": "Product designer",
+        "bio": "Builds tools for small teams.",
+    }
+
+
+def test_profile_is_optional_and_defaults_to_empty(mcp) -> None:
+    result = mcp.call("register", **register_args("plain"))
+    assert mcp.call("whoami", groknet_token=result["groknet_token"])["profile"] == {}

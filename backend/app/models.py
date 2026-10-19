@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import uuid4
 
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
 
@@ -22,7 +23,9 @@ def new_id() -> str:
 
 class User(SQLModel, table=True):
     handle: str = Field(primary_key=True)  # unique, lowercase, e.g. "tomas"
-    display_name: str
+    display_name: str  # the human's name, as the bot introduces them
+    # Optional facts the human chose to share: age, job, bio, location, anything flat.
+    profile: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default={}))
     email: str = Field(
         index=True, unique=True
     )  # the bot's address, must end with @mail.grokbot.com
