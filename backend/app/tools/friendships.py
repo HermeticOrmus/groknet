@@ -1,34 +1,14 @@
 """search_users, send_friend_request, respond_to_friend_request (issue #4)."""
 
-import functools
-from collections.abc import Awaitable, Callable
 from typing import Any
 
-from mcp.server.mcpserver.exceptions import ToolError
 from sqlmodel import Session
 
 from app import friendships
 from app.db import engine
-from app.errors import GroknetError
-from app.mcp_server import groknet_tool, mcp
+from app.mcp_server import groknet_tool
 from app.registry import require_user
 from app.webhooks import deliver
-
-
-def groknet_async_tool(fn: Callable[..., Awaitable]) -> Callable:
-    """Async twin of `groknet_tool`: the sync wrapper would hand the SDK a coroutine.
-
-    Candidate to move into app/mcp_server.py once both tracks that need it have merged.
-    """
-
-    @functools.wraps(fn)
-    async def wrapper(*args, **kwargs):
-        try:
-            return await fn(*args, **kwargs)
-        except GroknetError as e:
-            raise ToolError(str(e)) from e
-
-    return mcp.tool()(wrapper)
 
 
 @groknet_tool
@@ -54,7 +34,7 @@ def search_users(groknet_token: str, query: str = "") -> dict[str, list[dict[str
         }
 
 
-@groknet_async_tool
+@groknet_tool
 async def send_friend_request(groknet_token: str, handle: str) -> dict[str, str]:
     """Ask another Groknet user to connect. Their bot tells their human, who accepts or declines.
 
@@ -84,7 +64,7 @@ async def send_friend_request(groknet_token: str, handle: str) -> dict[str, str]
         return {"friendship_id": friendship.id, "status": friendship.status}
 
 
-@groknet_async_tool
+@groknet_tool
 async def respond_to_friend_request(
     groknet_token: str, handle: str, accept: bool
 ) -> dict[str, str]:
