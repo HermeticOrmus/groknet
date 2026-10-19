@@ -8,7 +8,6 @@ from app import teams
 from app.db import engine
 from app.mcp_server import groknet_tool
 from app.registry import require_user
-from app.tools.messaging import async_groknet_tool
 
 
 @groknet_tool
@@ -27,7 +26,7 @@ def add_to_team(groknet_token: str, team_id: str, handle: str) -> dict[str, list
         return {"members": teams.add_to_team(session, user, team_id, handle)}
 
 
-@async_groknet_tool
+@groknet_tool
 async def send_team_message(
     groknet_token: str, team_id: str, body: str, mentions: list[str] | None = None
 ) -> dict[str, Any]:

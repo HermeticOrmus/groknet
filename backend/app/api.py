@@ -5,7 +5,7 @@
                          dashboard read API: live DB rows, never credentials
 /api/events              SSE stream of everything the backend sends to bots
 /api/dev/*               seed data and fake events, only with GROKNET_DEV=1
-Mirrors of the MCP tools under /api (TODO, issue #6).
+Mirrors of the MCP tools under /api live in app/rest.py (issue #6).
 """
 
 import asyncio
