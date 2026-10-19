@@ -10,6 +10,7 @@ from sqlmodel import Session
 from app import teams
 from app.db import get_session
 from app.errors import AuthError
+from app.models import User
 from app.registry import require_user
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -33,7 +34,7 @@ class SendTeamMessage(BaseModel):
 def caller(
     session: SessionDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-):
+) -> User:
     if credentials is None:
         raise HTTPException(401, "Bearer groknet_token required.")
     try:
@@ -42,12 +43,15 @@ def caller(
         raise HTTPException(401, str(exc)) from exc
 
 
+CallerDep = Annotated[User, Depends(caller)]
+
+
 def rejected(exc: teams.TeamError) -> HTTPException:
     return HTTPException(exc.status_code, str(exc))
 
 
 @router.post("")
-def create_team(data: CreateTeam, session: SessionDep, user=Depends(caller)):
+def create_team(data: CreateTeam, session: SessionDep, user: CallerDep):
     try:
         return {"team_id": teams.create_team(session, user, data.name).id}
     except teams.TeamError as exc:
@@ -55,7 +59,7 @@ def create_team(data: CreateTeam, session: SessionDep, user=Depends(caller)):
 
 
 @router.post("/{team_id}/members")
-def add_member(team_id: str, data: AddMember, session: SessionDep, user=Depends(caller)):
+def add_member(team_id: str, data: AddMember, session: SessionDep, user: CallerDep):
     try:
         return {"members": teams.add_to_team(session, user, team_id, data.handle)}
     except teams.TeamError as exc:
@@ -63,9 +67,7 @@ def add_member(team_id: str, data: AddMember, session: SessionDep, user=Depends(
 
 
 @router.post("/{team_id}/messages")
-async def send_message(
-    team_id: str, data: SendTeamMessage, session: SessionDep, user=Depends(caller)
-):
+async def send_message(team_id: str, data: SendTeamMessage, session: SessionDep, user: CallerDep):
     try:
         return await teams.send_team_message(session, user, team_id, data.body, data.mentions)
     except teams.TeamError as exc:

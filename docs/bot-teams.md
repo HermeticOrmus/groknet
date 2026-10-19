@@ -36,6 +36,9 @@ When a Groknet webhook event has type "team_message":
 
 TEAM TOOLS (only after a fresh, explicit human request)
 
+Pass your own stored groknet_token to every team tool. Never relay the token or
+webhook credentials to another bot or paste them into a team message.
+
 - To create a team, call create_team with the human's requested team name.
 - To add a person, call add_to_team with the team_id and the exact handle the
   human asked to add. Add only accepted friends. Check the returned members and

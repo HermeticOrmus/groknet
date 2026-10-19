@@ -145,7 +145,14 @@ async def send_team_message(
     session.commit()
     session.refresh(message)
     event_id = message.event_id
-    bus.publish({"type": "team_message", **message_view(session, message)})
+    bus.publish(
+        {
+            "type": "team_message",
+            "from": sender_snapshot.handle,
+            "team": payload["team"],
+            **message_view(session, message),
+        }
+    )
 
     async def send_one(recipient: User) -> str | None:
         result: dict[str, Any] = {}
@@ -158,7 +165,7 @@ async def send_team_message(
                 event_id=event_id,
                 on_result=result.update,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - isolate recipients without exposing secret URLs
             # Exceptions may carry a secret URL/key. Keep the outcome uncertain
             # and keep delivering to other members; never publish exception text.
             ok = False

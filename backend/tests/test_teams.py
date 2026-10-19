@@ -31,18 +31,14 @@ def network(mcp, make_inbox):
                 )
             )
         session.commit()
-    team_id = mcp.call("create_team", groknet_token=tokens[handles[0]], name="Demo team")[
-        "team_id"
-    ]
+    team_id = mcp.call("create_team", groknet_token=tokens[handles[0]], name="Demo team")["team_id"]
     return handles, inboxes, tokens, team_id
 
 
 def join(mcp, network, count=2):
     handles, _, tokens, team_id = network
     for handle in handles[1 : count + 1]:
-        mcp.call(
-            "add_to_team", groknet_token=tokens[handles[0]], team_id=team_id, handle=handle
-        )
+        mcp.call("add_to_team", groknet_token=tokens[handles[0]], team_id=team_id, handle=handle)
 
 
 def test_creator_membership_and_idempotent_add(mcp, client, network):
@@ -66,13 +62,9 @@ def test_membership_and_accepted_friendship_are_required(mcp, network):
         (handles[3], handles[1], "team member"),
     ):
         with pytest.raises(ToolError, match=expected):
-            mcp.call(
-                "add_to_team", groknet_token=tokens[caller], team_id=team_id, handle=target
-            )
+            mcp.call("add_to_team", groknet_token=tokens[caller], team_id=team_id, handle=target)
     with pytest.raises(ToolError, match="team member"):
-        mcp.call(
-            "send_team_message", groknet_token=tokens[handles[3]], team_id=team_id, body="Hi"
-        )
+        mcp.call("send_team_message", groknet_token=tokens[handles[3]], team_id=team_id, body="Hi")
     with pytest.raises(ToolError, match="Unknown groknet_token"):
         mcp.call("create_team", groknet_token="invalid", name="Nope")
 
@@ -98,7 +90,12 @@ def test_invalid_mentions_and_empty_inputs_have_no_delivery_side_effect(mcp, net
 
 def test_fanout_one_message_sender_excluded_and_receipts_survive_reads(mcp, client, network):
     handles, inboxes, tokens, team_id = network
-    join(mcp, network)
+    with Session(engine) as session:
+        session.add(
+            Friendship(requester=handles[0], addressee=handles[3], status=FriendshipStatus.accepted)
+        )
+        session.commit()
+    join(mcp, network, count=3)
     feed = bus.subscribe()
     try:
         result = mcp.call(
@@ -113,9 +110,9 @@ def test_fanout_one_message_sender_excluded_and_receipts_survive_reads(mcp, clie
             events.append(json.loads(feed.get_nowait()))
     finally:
         bus.unsubscribe(feed)
-    assert sorted(result["delivered_to"]) == sorted(handles[1:3])
-    assert inboxes[handles[0]].events == inboxes[handles[3]].events == []
-    for handle in handles[1:3]:
+    assert sorted(result["delivered_to"]) == sorted(handles[1:])
+    assert inboxes[handles[0]].events == []
+    for handle in handles[1:]:
         [event] = inboxes[handle].events
         assert event["event_id"] == result["event_id"]
         assert event["payload"] == {
@@ -128,8 +125,8 @@ def test_fanout_one_message_sender_excluded_and_receipts_survive_reads(mcp, clie
     assert initial["team_id"] == team_id
     assert all(receipt["status"] == "pending" for receipt in initial["deliveries"])
     receipts = [event for event in events if event["type"] == "delivery"]
-    assert len(receipts) == 2
-    assert {event["to"] for event in receipts} == set(handles[1:3])
+    assert len(receipts) == 3
+    assert {event["to"] for event in receipts} == set(handles[1:])
     assert all(event["team_id"] == team_id and event["revision"] == 2 for event in receipts)
     for _ in range(2):
         [stored] = client.get(f"/api/teams/{team_id}/messages").json()
@@ -212,9 +209,12 @@ def test_transport_exception_is_unknown_and_other_recipient_completes(
 def test_rest_and_mcp_share_team_rules(client, mcp, network):
     handles, _, tokens, _ = network
     assert client.post("/api/teams", json={"name": "REST team"}).status_code == 401
-    assert client.post(
-        "/api/teams", headers={"Authorization": "Bearer invalid"}, json={"name": "No"}
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/teams", headers={"Authorization": "Bearer invalid"}, json={"name": "No"}
+        ).status_code
+        == 401
+    )
     headers = {"Authorization": f"Bearer {tokens[handles[0]]}"}
     response = client.post("/api/teams", headers=headers, json={"name": "REST team"})
     assert response.status_code == 200
@@ -223,9 +223,12 @@ def test_rest_and_mcp_share_team_rules(client, mcp, network):
         f"/api/teams/{team_id}/members", headers=headers, json={"handle": handles[1]}
     ).json() == {"members": sorted(handles[:2])}
     outsider = {"Authorization": f"Bearer {tokens[handles[3]]}"}
-    assert client.post(
-        f"/api/teams/{team_id}/messages", headers=outsider, json={"body": "No"}
-    ).status_code == 403
+    assert (
+        client.post(
+            f"/api/teams/{team_id}/messages", headers=outsider, json={"body": "No"}
+        ).status_code
+        == 403
+    )
     sent = client.post(
         f"/api/teams/{team_id}/messages",
         headers=headers,

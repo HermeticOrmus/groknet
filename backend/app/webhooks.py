@@ -94,13 +94,13 @@ async def deliver(
                 await asyncio.sleep(RETRY_BACKOFF_S[attempt])
 
     receipt = {
-            "type": "delivery",
-            "event_id": event_id,
-            "event_type": event_type,
-            "to": recipient.handle,
-            "ok": ok,
-            "status": status,
-        }
+        "type": "delivery",
+        "event_id": event_id,
+        "event_type": event_type,
+        "to": recipient.handle,
+        "ok": ok,
+        "status": status,
+    }
     if on_result is not None:
         on_result(receipt)
     else:

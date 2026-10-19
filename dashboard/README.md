@@ -107,7 +107,12 @@ the `event_id` on the corresponding `delivery` event.
     "name": "Groknet core",
     "created_by": "tomas",
     "created_at": "2026-10-19T21:20:00Z",
-    "members": ["alejandro", "juan", "tomas"]
+    "members": ["alejandro", "juan", "tomas"],
+    "member_details": [
+      {"handle": "alejandro", "display_name": "Alejandro"},
+      {"handle": "juan", "display_name": "Juan"},
+      {"handle": "tomas", "display_name": "Tomas"}
+    ]
   }
 ]
 ```
@@ -131,6 +136,101 @@ plain `EventSource`; there is no replay, load history from the endpoints above.
 
 `from` and `to` are handles. One `message` or `team_message` event is followed
 by one `delivery` event per recipient bot, correlated by `event_id`. Render a
-failed delivery (`ok: false`) loudly: it means a human did not get the message.
+delivery result visibly. A confirmed receipt means the webhook accepted the
+request, not that a human read or approved it. A timeout can leave acceptance
+unknown.
 
 Try any of them without bots: `curl -X POST localhost:8000/api/dev/emit -H 'Content-Type: application/json' -d '{"type":"delivery","ok":false,"status":503}'`.
+
+## Teams page and integration (#15–#18)
+
+`/teams.html` is a standalone, dependency-free Teams view served by the existing
+nginx image. It can coexist with the global dashboard shell. `teams.js` accepts
+both legacy handle-only `members` and the additive `member_details` above. All
+copy actions prepare instructions for the user's Grok bot; they do not execute
+mutations or ask the browser to hold a bot token.
+
+MCP tools are `create_team(groknet_token, name)`,
+`add_to_team(groknet_token, team_id, handle)`, and
+`send_team_message(groknet_token, team_id, body, mentions=[])`. A creator is the
+first member. Adding a member requires the caller's accepted friendship; all
+mentions must be team members. Fan-out goes to every member except the sender.
+
+Their REST mirrors require `Authorization: Bearer <groknet_token>`:
+
+| Method/path | JSON body | Result |
+| --- | --- | --- |
+| POST `/api/teams` | `{ "name": "Demo" }` | `{ "team_id": "..." }` |
+| POST `/api/teams/{id}/members` | `{ "handle": "alejandro" }` | `{ "members": ["alejandro", "juan"] }` |
+| POST `/api/teams/{id}/messages` | `{ "body": "Hi @alejandro", "mentions": ["alejandro"] }` | `{ "event_id": "...", "delivered_to": ["alejandro"] }` |
+
+Read errors/mutation errors are JSON `detail` responses: 401 for missing or
+invalid bearer identity, 403 for membership/friendship violations, 404 for a
+missing team/user, and 400 for rejected team/message inputs. Read endpoints
+inherit the shared app's read/session policy; this slice does not implement #12.
+
+### GET `/api/teams/{id}/messages?limit=200`
+
+Returns the most recent `limit` messages (1–200), ordered oldest first:
+
+```json
+[{"id":"message-id","event_id":"event-id","sender":"juan","sender_name":"Juan",
+  "recipient":null,"team_id":"team-id","body":"Hi @alejandro","mentions":["alejandro"],
+  "delivered":true,"created_at":"2026-10-19T23:00:00Z",
+  "deliveries":[{"recipient":"alejandro","status":"delivered","revision":2,
+                 "updated_at":"2026-10-19T23:00:01Z"}]}]
+```
+
+`delivered_to` contains confirmed recipients only. A message's legacy aggregate
+`delivered` flag cannot describe partial delivery; use `deliveries`. Receipts
+are persisted with the original recipient snapshot, so adding a member later
+does not add them to old messages. Statuses are `pending`, `delivered`, `failed`
+(definitive rejection), and `unknown` (including uncertain transport outcomes).
+Each starts at revision 1 and settles at revision 2. No team-level automatic
+resend is added on top of the shared sender's retry policy.
+
+### Team SSE events
+
+- `team_created`: `{ "type":"team_created", "team_id":"..." }`
+- `team_member_added`: `{ "type":"team_member_added", "team_id":"...", "handle":"..." }`
+- `team_message`: the normalized history message above with `type`, plus legacy
+  `from` (sender handle) and `team: {id,name}` fields. It is published before
+  dispatch, with pending recipient receipts.
+- Team `delivery`: `{ "type":"delivery", "event_type":"team_message", "event_id":"...",
+  "team_id":"...", "to":"alejandro", "delivery_status":"delivered", "revision":2,
+  "updated_at":"...", "ok":true, "status":200 }`. `status` is the final HTTP
+  status or null; `delivery_status` carries the outcome to render.
+
+Correlate by `(event_id, recipient)` and retain the higher receipt revision when
+reconciling snapshots with SSE. Open SSE before loading history; buffer delivery
+updates received before their message. On reconnect reload both roster and
+selected-channel history. The standalone page owns its EventSource; when moved
+into the global shell, feed it from the shell's shared stream instead of opening
+a second one. Inbound message bodies are rendered as text.
+
+### Local simulator and verification
+
+```bash
+cd backend
+uv sync --frozen --python 3.13
+cd ..
+bin/prove
+backend/.venv/bin/python scripts/preview_teams.py
+```
+
+Open `http://127.0.0.1:8017/teams.html?demo=1`. The preview creates a disposable
+database, four fake loopback inboxes, a team request/reply, and one rejected
+recipient. It never resets the normal DB or sends to real Grok Bots. Stop it to
+remove the temporary DB. To produce a live SSE reply while viewing the page:
+
+```bash
+curl -X POST http://127.0.0.1:8017/_preview/reply \
+  -H 'Content-Type: application/json' -d '{"body":"A new simulated reply"}'
+```
+
+The `_preview` endpoint exists only in this local launcher. `--smoke` checks the
+fixture and exits. `bin/prove` reports `typecheck=NA` because no static type
+checker is configured; it checks Ruff, Python/JS syntax, backend integration
+tests and Node reconciliation tests. Real Grok approvals still need the steps
+in [bot-teams.md](../docs/bot-teams.md), which is the copyable extension to the
+base inbox template owned by the bot-template track.

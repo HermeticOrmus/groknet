@@ -433,6 +433,8 @@
   }
 
   async function boot() {
+    const demoBanner = $("demo-banner");
+    if (demoBanner) demoBanner.hidden = new URLSearchParams(window.location.search).get("demo") !== "1";
     $("create-team").addEventListener("click", copyCreateCommand);
     $("add-member").addEventListener("click", copyAddCommand);
     $("copy-send").addEventListener("click", copySendCommand);
