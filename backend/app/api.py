@@ -1,22 +1,25 @@
 """REST surface.
 
 /api/health              liveness
-/api/users ...           dashboard read API (TODO: fill in; returns live DB rows, never credentials)
+/api/users, /friendships, /messages, /teams
+                         dashboard read API: live DB rows, never credentials
 /api/events              SSE stream of everything the backend sends to bots
-Mirrors of the MCP tools under /api (TODO, issue: REST mirror).
+/api/dev/*               seed data and fake events, only with GROKNET_DEV=1
+Mirrors of the MCP tools under /api (TODO, issue #6).
 """
 
 import asyncio
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
+from app import config, dev
 from app.db import get_session
 from app.events import bus
-from app.models import Friendship, Message, Team, User
+from app.models import Friendship, Message, Team, TeamMember, User
 
 router = APIRouter(prefix="/api")
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -29,25 +32,56 @@ def health() -> dict[str, str]:
 
 @router.get("/users")
 def list_users(session: SessionDep) -> list[dict]:
+    # Never groknet_token, webhook_url or webhook_key.
     return [
-        {"handle": u.handle, "display_name": u.display_name, "created_at": u.created_at}
-        for u in session.exec(select(User)).all()
+        {
+            "handle": u.handle,
+            "display_name": u.display_name,
+            "email": u.email,
+            # Optional facts about the human (age, job, bio, location...). The column
+            # lands with the register-profile work; until then it is always {}.
+            "profile": getattr(u, "profile", None) or {},
+            "created_at": u.created_at,
+        }
+        for u in session.exec(select(User).order_by(User.created_at)).all()
     ]
 
 
 @router.get("/friendships")
 def list_friendships(session: SessionDep) -> list[Friendship]:
-    return list(session.exec(select(Friendship)).all())
+    return list(session.exec(select(Friendship).order_by(Friendship.created_at)).all())
 
 
 @router.get("/messages")
-def list_messages(session: SessionDep) -> list[Message]:
-    return list(session.exec(select(Message).order_by(Message.created_at.desc()).limit(200)).all())
+def list_messages(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    handle: str | None = None,
+) -> list[Message]:
+    stmt = select(Message)
+    if handle:
+        stmt = stmt.where(or_(Message.sender == handle, Message.recipient == handle))
+    stmt = stmt.order_by(Message.created_at.desc()).limit(limit)
+    return list(session.exec(stmt).all())
 
 
 @router.get("/teams")
-def list_teams(session: SessionDep) -> list[Team]:
-    return list(session.exec(select(Team)).all())
+def list_teams(session: SessionDep) -> list[dict]:
+    teams = session.exec(select(Team).order_by(Team.created_at)).all()
+    members = session.exec(select(TeamMember)).all()
+    by_team: dict[str, list[str]] = {}
+    for m in members:
+        by_team.setdefault(m.team_id, []).append(m.user_handle)
+    return [
+        {
+            "id": t.id,
+            "name": t.name,
+            "created_by": t.created_by,
+            "created_at": t.created_at,
+            "members": sorted(by_team.get(t.id, [])),
+        }
+        for t in teams
+    ]
 
 
 @router.get("/events")
@@ -71,3 +105,34 @@ async def events() -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- dev only -----------------------------------------------------------------
+
+
+def require_dev_mode() -> None:
+    # Read at request time (not import time) so it can be toggled in tests.
+    if not config.DEV_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+dev_router = APIRouter(prefix="/dev", dependencies=[Depends(require_dev_mode)])
+
+
+@dev_router.post("/seed")
+def dev_seed(session: SessionDep) -> dict[str, int]:
+    """Wipe the database and load the demo dataset (4 users, 3 friendships, 10 messages, 1 team)."""
+    return dev.seed(session)
+
+
+@dev_router.post("/emit")
+def dev_emit(body: dict[str, Any]) -> dict[str, Any]:
+    """Publish one fake event on /api/events. Body: {"type": "<event type>", ...overrides}."""
+    event_type = body.get("type")
+    if not event_type:
+        raise HTTPException(status_code=422, detail="body needs a 'type'")
+    overrides = {k: v for k, v in body.items() if k != "type"}
+    return dev.emit(event_type, overrides)
+
+
+router.include_router(dev_router)
