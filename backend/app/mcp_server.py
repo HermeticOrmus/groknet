@@ -8,6 +8,7 @@ auth passing headers. See docs/design.md.
 """
 
 import functools
+import inspect
 from collections.abc import Callable
 
 from mcp.server.mcpserver import MCPServer
@@ -26,10 +27,21 @@ mcp = MCPServer(
 
 
 def groknet_tool(fn: Callable) -> Callable:
-    """Register an MCP tool whose GroknetErrors reach the bot with their message intact.
+    """Register an MCP tool (sync or async) whose GroknetErrors reach the bot with their message intact.
 
-    The SDK hides the text of any exception that is not its own ToolError.
+    The SDK hides the text of any exception that is not its own ToolError. Async tools get an
+    async wrapper: a sync one would hand the SDK an unawaited coroutine as the tool's result.
     """
+    if inspect.iscoroutinefunction(fn):
+
+        @functools.wraps(fn)
+        async def async_wrapper(*args, **kwargs):
+            try:
+                return await fn(*args, **kwargs)
+            except GroknetError as e:
+                raise ToolError(str(e)) from e
+
+        return mcp.tool()(async_wrapper)
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):

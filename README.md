@@ -61,6 +61,26 @@ scripts/groknet.sh tools             # curl wrappers for every MCP tool; GROKNET
 scripts/groknet.sh register tomas Tomas tomas@mail.grokbot.com http://localhost:9101/automations/webhook/alice crsr_alice '{"job":"Founder"}'
 ```
 
+### REST
+
+Every MCP tool has a REST twin under `/api`, backed by the same services. Auth is
+`Authorization: Bearer <groknet_token>` (except register). A rejected request is
+400 `{"detail": "<message>"}`; a missing or unknown token is 401.
+
+| Endpoint | Body / query | Returns |
+|----------|--------------|---------|
+| `POST /api/register` | `{handle, display_name, email, webhook_url, webhook_key, profile?}` | 201 `{handle, groknet_token}` |
+| `GET /api/me` | | `{handle, display_name, profile, email, webhook_url}` |
+| `GET /api/search?q=` | | `[{handle, display_name, profile}]` |
+| `POST /api/friends/request` | `{handle}` | `{friendship_id, status}` |
+| `POST /api/friends/respond` | `{handle, accept}` | `{status}` |
+| `POST /api/messages` | `{handle, body}` | `{event_id, delivered}` |
+
+```bash
+curl -X POST localhost:8000/api/messages -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"handle":"alejandro","body":"hola"}'
+```
+
 With `GROKNET_DEV=1`, `POST /api/dev/seed` loads demo data and `POST /api/dev/emit`
 publishes fake events on `/api/events` so the dashboard can be built without bots.
 See `dashboard/README.md` for every JSON shape.

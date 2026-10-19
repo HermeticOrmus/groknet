@@ -1,7 +1,8 @@
 """Discovery and the human-approved friendship graph (issue #4).
 
-Service functions are sync and take a Session; the tools in app/tools/friendships.py
-wrap them and do the async webhook delivery.
+The sync functions change the graph. `send_friend_request` and `respond_to_friend_request`
+wrap them with the async webhook delivery; those two are what the MCP tools and the REST
+mirror call.
 """
 
 from sqlmodel import Session, col, or_, select
@@ -9,6 +10,7 @@ from sqlmodel import Session, col, or_, select
 from app.errors import GroknetError
 from app.events import bus
 from app.models import Friendship, FriendshipStatus, User, now
+from app.webhooks import deliver
 
 
 class FriendshipError(GroknetError):
@@ -95,4 +97,44 @@ def _accept(session: Session, friendship: Friendship, caller: User) -> Friendshi
     session.commit()
     session.refresh(friendship)
     bus.publish({"type": "friend_accepted", "from": caller.handle, "to": friendship.requester})
+    return friendship
+
+
+async def send_friend_request(session: Session, caller: User, handle: str) -> Friendship:
+    """request_friendship, then tell the other bot: a new request, or an acceptance."""
+    friendship, event = request_friendship(session, caller, handle)
+    other_handle = (
+        friendship.addressee if friendship.requester == caller.handle else friendship.requester
+    )
+    other = get_user(session, other_handle)
+    if event == "friend_request":
+        await deliver(
+            other,
+            event_type="friend_request",
+            sender=caller,
+            payload={"message": f"{caller.display_name} wants to connect on Groknet"},
+        )
+    elif event == "friend_accepted":
+        await deliver(
+            other,
+            event_type="friend_accepted",
+            sender=caller,
+            payload={"message": f"{caller.display_name} accepted your request"},
+        )
+    return friendship
+
+
+async def respond_to_friend_request(
+    session: Session, caller: User, handle: str, accept: bool
+) -> Friendship:
+    """respond, then tell the requester's bot if accepted."""
+    friendship = respond(session, caller, handle, accept)
+    if accept:
+        requester = get_user(session, friendship.requester)
+        await deliver(
+            requester,
+            event_type="friend_accepted",
+            sender=caller,
+            payload={"message": f"{caller.display_name} accepted your request"},
+        )
     return friendship
