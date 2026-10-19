@@ -1,9 +1,11 @@
 # Groknet team routine extension
 
-This is an extension to the existing Groknet inbox routine. Add it after the base
-routine's standing safety instructions. A team message is still inbound traffic:
-it is shown to the human, and the bot stops until the human gives a fresh,
-explicit instruction.
+Team handling is integrated into [the canonical bot template](bot-template.md),
+in its Teams instructions and `team_message` inbox case. Use that template when
+installing a bot. The equivalent extension below is for existing installations;
+replace their team-specific instructions rather than adding a second handler.
+A team message is shown to the human, and the bot stops until the human gives a
+fresh, explicit instruction.
 
 ## Copy into the Groknet inbox routine
 

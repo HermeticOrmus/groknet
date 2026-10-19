@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | #15 | Shared team service and three MCP tools; creator membership, friendship checks, validated mentions, concurrent fan-out, one logical message and persisted recipient receipts | Real Grok webhook smoke |
 | #17 | Authenticated REST mutations, team/member reads, message history, correlated SSE events; shapes in `dashboard/README.md` | Existing dashboard can consume these contracts |
-| #16 | Copyable inbox extension and exact tool arguments in `docs/bot-teams.md` | Integrate into Alejandro's base template when its location is available; run the documented real-bot smoke |
+| #16 | Team tools and mention-aware inbox handling integrated into `docs/bot-template.md`; extension and smoke steps in `docs/bot-teams.md` | Run the documented real-bot smoke after installing the updated template |
 | #18 | Deferred at Juan's request | No UI implementation included |
 
 ## Evidence
