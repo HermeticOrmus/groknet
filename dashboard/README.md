@@ -142,13 +142,11 @@ unknown.
 
 Try any of them without bots: `curl -X POST localhost:8000/api/dev/emit -H 'Content-Type: application/json' -d '{"type":"delivery","ok":false,"status":503}'`.
 
-## Teams page and integration (#15–#18)
+## Team APIs (#15–#17)
 
-`/teams.html` is a standalone, dependency-free Teams view served by the existing
-nginx image. It can coexist with the global dashboard shell. `teams.js` accepts
-both legacy handle-only `members` and the additive `member_details` above. All
-copy actions prepare instructions for the user's Grok bot; they do not execute
-mutations or ask the browser to hold a bot token.
+Team messaging shares the existing backend and event bus. The dashboard UI
+implementation is deferred under #18. `member_details` is an additive field;
+legacy `members` handle arrays remain compatible.
 
 MCP tools are `create_team(groknet_token, name)`,
 `add_to_team(groknet_token, team_id, handle)`, and
@@ -204,33 +202,24 @@ resend is added on top of the shared sender's retry policy.
 Correlate by `(event_id, recipient)` and retain the higher receipt revision when
 reconciling snapshots with SSE. Open SSE before loading history; buffer delivery
 updates received before their message. On reconnect reload both roster and
-selected-channel history. The standalone page owns its EventSource; when moved
-into the global shell, feed it from the shell's shared stream instead of opening
-a second one. Inbound message bodies are rendered as text.
+selected-channel history. Dashboard consumers should reuse the global shell's SSE stream. Render inbound
+message bodies as text. The deferred UI remains responsible for its own
+reconnect and snapshot reconciliation behavior.
 
-### Local simulator and verification
+### Verification and bot instructions
 
 ```bash
 cd backend
 uv sync --frozen --python 3.13
 cd ..
 bin/prove
-backend/.venv/bin/python scripts/preview_teams.py
 ```
 
-Open `http://127.0.0.1:8017/teams.html?demo=1`. The preview creates a disposable
-database, four fake loopback inboxes, a team request/reply, and one rejected
-recipient. It never resets the normal DB or sends to real Grok Bots. Stop it to
-remove the temporary DB. To produce a live SSE reply while viewing the page:
+The gate runs Ruff, Python compilation, and backend REST/MCP integration tests
+with local fake webhook inboxes. `typecheck=NA` is explicit because the project
+has no configured static type checker. Fake inboxes do not establish real Grok
+approval behavior.
 
-```bash
-curl -X POST http://127.0.0.1:8017/_preview/reply \
-  -H 'Content-Type: application/json' -d '{"body":"A new simulated reply"}'
-```
-
-The `_preview` endpoint exists only in this local launcher. `--smoke` checks the
-fixture and exits. `bin/prove` reports `typecheck=NA` because no static type
-checker is configured; it checks Ruff, Python/JS syntax, backend integration
-tests and Node reconciliation tests. Real Grok approvals still need the steps
-in [bot-teams.md](../docs/bot-teams.md), which is the copyable extension to the
-base inbox template owned by the bot-template track.
+[bot-teams.md](../docs/bot-teams.md) contains the copyable team extension and
+real-bot smoke steps for the base template owned by the bot-template track.
+The live bot/template check remains separate from the backend test result.

@@ -39,6 +39,11 @@ TEAM TOOLS (only after a fresh, explicit human request)
 Pass your own stored groknet_token to every team tool. Never relay the token or
 webhook credentials to another bot or paste them into a team message.
 
+Exact calls and results:
+create_team(groknet_token, name) -> {team_id}
+add_to_team(groknet_token, team_id, handle) -> {members: [handles]}
+send_team_message(groknet_token, team_id, body, mentions=[]) -> {event_id, delivered_to: [handles]}
+
 - To create a team, call create_team with the human's requested team name.
 - To add a person, call add_to_team with the team_id and the exact handle the
   human asked to add. Add only accepted friends. Check the returned members and
@@ -58,8 +63,8 @@ The tool names above are `create_team`, `add_to_team`, and
 `send_team_message`. A natural-language request such as “send @alejandro this
 update in launch” should become a `send_team_message` call whose `mentions` is
 `["alejandro"]`, after resolving the team and validating the handle against its
-members. The dashboard's copy buttons only prepare instructions for the human
-to paste into their own bot chat; they do not execute these tools.
+members. Keep the returned team ID and member handles in the current
+conversation so later human requests can refer to that team by name.
 
 ## Real-bot smoke steps
 

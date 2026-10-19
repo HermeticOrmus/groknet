@@ -132,6 +132,8 @@ def test_fanout_one_message_sender_excluded_and_receipts_survive_reads(mcp, clie
         [stored] = client.get(f"/api/teams/{team_id}/messages").json()
         assert stored["event_id"] == result["event_id"]
         assert stored["mentions"] == [handles[1]]
+        assert stored["created_at"].endswith("Z")
+        assert all(r["updated_at"].endswith("Z") for r in stored["deliveries"])
         assert all(r["status"] == "delivered" and r["revision"] == 2 for r in stored["deliveries"])
     rendered = json.dumps(events) + json.dumps(stored)
     assert "groknet_token" not in rendered and "webhook_key" not in rendered

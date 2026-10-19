@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Static dashboard + Python backend checks; no provider calls or production data.
+# Python backend checks; no provider calls or production data.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-project_root="$PWD"
 lint=NOT_RUN
 build=NOT_RUN
 smoke=NOT_RUN
@@ -19,9 +18,7 @@ git diff --check
 lint=PASS
 build=FAIL
 backend/.venv/bin/python -m compileall -q backend/app
-node --check dashboard/public/teams.js
 build=PASS
 smoke=FAIL
 (cd backend && .venv/bin/pytest -q)
-node --test dashboard/public/teams.test.js
 smoke=PASS

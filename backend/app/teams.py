@@ -1,6 +1,7 @@
 """Team membership and concurrent message fan-out, shared by REST and MCP."""
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlmodel import Session, select
@@ -17,6 +18,13 @@ class TeamError(GroknetError):
     def __init__(self, message: str, status_code: int = 400):
         super().__init__(message)
         self.status_code = status_code
+
+
+def utc_timestamp(value: datetime) -> str:
+    # SQLite returns naive datetimes even when the original value was UTC.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def require_team(session: Session, team_id: str) -> Team:
@@ -42,6 +50,7 @@ def team_view(session: Session, team: Team) -> dict[str, Any]:
     ).all()
     return {
         **team.model_dump(mode="json"),
+        "created_at": utc_timestamp(team.created_at),
         "members": sorted(u.handle for u in members),
         "member_details": [{"handle": u.handle, "display_name": u.display_name} for u in members],
     }
@@ -87,7 +96,10 @@ def add_to_team(session: Session, caller: User, team_id: str, handle: str) -> li
 
 
 def receipt_view(receipt: TeamDelivery) -> dict[str, Any]:
-    return receipt.model_dump(mode="json", exclude={"event_id"})
+    return {
+        **receipt.model_dump(mode="json", exclude={"event_id"}),
+        "updated_at": utc_timestamp(receipt.updated_at),
+    }
 
 
 def message_view(session: Session, message: Message) -> dict[str, Any]:
@@ -99,6 +111,7 @@ def message_view(session: Session, message: Message) -> dict[str, Any]:
     ).all()
     return {
         **message.model_dump(mode="json"),
+        "created_at": utc_timestamp(message.created_at),
         "sender_name": sender.display_name if sender else message.sender,
         "mentions": message.mentions.split(",") if message.mentions else [],
         "deliveries": [receipt_view(receipt) for receipt in receipts],
@@ -189,7 +202,7 @@ async def send_team_message(
                 "to": recipient.handle,
                 "delivery_status": receipt.status,
                 "revision": receipt.revision,
-                "updated_at": receipt.updated_at.isoformat(),
+                "updated_at": utc_timestamp(receipt.updated_at),
                 "ok": bool(ok),
                 "status": status,
             }
