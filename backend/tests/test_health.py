@@ -7,11 +7,12 @@ def test_health(client) -> None:
     assert resp.json()["status"] == "ok"
 
 
-def test_read_endpoints_start_empty(client) -> None:
+def test_read_endpoints_return_lists(client) -> None:
+    # The test DB is shared across the session, so other test files may have populated it.
     for path in ("/api/users", "/api/friendships", "/api/messages", "/api/teams"):
         resp = client.get(path)
         assert resp.status_code == 200, path
-        assert resp.json() == []
+        assert isinstance(resp.json(), list)
 
 
 def test_mcp_lists_ping_tool(client) -> None:
