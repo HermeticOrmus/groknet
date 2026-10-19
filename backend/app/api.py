@@ -16,7 +16,8 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.events import bus
-from app.models import Friendship, Message, Team, User
+from app.models import Friendship, Message, User
+from app.teams import list_teams as read_teams
 
 router = APIRouter(prefix="/api")
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -46,8 +47,8 @@ def list_messages(session: SessionDep) -> list[Message]:
 
 
 @router.get("/teams")
-def list_teams(session: SessionDep) -> list[Team]:
-    return list(session.exec(select(Team)).all())
+def list_teams(session: SessionDep) -> list[dict]:
+    return read_teams(session)
 
 
 @router.get("/events")

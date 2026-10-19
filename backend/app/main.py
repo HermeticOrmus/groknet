@@ -7,6 +7,7 @@ import app.tools
 from app.api import router as api_router
 from app.db import init_db
 from app.mcp_server import mcp
+from app.team_api import router as team_router
 
 # DNS-rebinding protection is off because cloudflared fronts us and the Host
 # header is groknet.eastwood.ai, not 127.0.0.1. Path is /mcp inside the sub-app,
@@ -30,5 +31,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Groknet", version="0.1.0", lifespan=lifespan)
 app.include_router(api_router)
+app.include_router(team_router)
 # Mounted last and at the root so /mcp is matched exactly; /api routes above win first.
 app.mount("/", mcp_app)
