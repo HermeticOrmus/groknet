@@ -13,6 +13,14 @@ from app.main import app
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
+@pytest.fixture(autouse=True)
+def no_retry_backoff(monkeypatch):
+    """Deliveries to dead inboxes still retry, just without the 1+3+9 s sleeps."""
+    import app.webhooks
+
+    monkeypatch.setattr(app.webhooks, "RETRY_BACKOFF_S", (0, 0, 0))
+
+
 @pytest.fixture(scope="session")
 def client():
     # One lifespan per test session: the MCP session manager can only be started once.
@@ -62,7 +70,8 @@ def register_args(handle="tomas", **overrides) -> dict:
         "handle": handle,
         "display_name": handle.capitalize(),
         "email": f"{handle}@mail.grokbot.com",
-        "webhook_url": f"https://api2.cursor.sh/automations/webhook/{handle}-routine",
+        # A closed local port, so a delivery nobody wired an inbox for fails fast and offline.
+        "webhook_url": f"http://127.0.0.1:9/automations/webhook/{handle}-routine",
         "webhook_key": f"crsr_{handle}_secret",
     }
     args.update(overrides)
