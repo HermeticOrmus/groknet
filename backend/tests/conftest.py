@@ -67,3 +67,79 @@ def register_args(handle="tomas", **overrides) -> dict:
     }
     args.update(overrides)
     return args
+
+
+class FakeInbox:
+    """A stand-in for a Grok Bot's webhook routine, running on a local port.
+
+    Records every POST it receives (`inbox.events`), with the bearer key seen
+    (`inbox.keys`). `inbox.respond_with` is a queue of status codes to return before
+    falling back to 200 + {"success": true}, so tests can script 503-then-200 etc.
+    """
+
+    def __init__(self) -> None:
+        import json as _json
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        inbox = self
+        self.events: list[dict] = []
+        self.keys: list[str] = []
+        self.respond_with: list[int] = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                inbox.keys.append(self.headers.get("Authorization", ""))
+                status = inbox.respond_with.pop(0) if inbox.respond_with else 200
+                if status == 200:
+                    inbox.events.append(_json.loads(body))
+                    payload = _json.dumps(
+                        {"success": True, "runUuid": "run-" + str(len(inbox.events))}
+                    )
+                elif status == 400:
+                    payload = _json.dumps({"success": False, "error": "Automation is disabled"})
+                elif status == 401:
+                    payload = _json.dumps({"code": "error", "message": "Invalid API key"})
+                else:
+                    payload = _json.dumps({"error": status})
+                data = payload.encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *_: object) -> None:
+                pass
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self._server.server_address[1]}/automations/webhook/fake"
+        threading.Thread(target=self._server.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+
+
+@pytest.fixture
+def fake_inbox():
+    """One fake bot inbox. Use `register_args(handle, webhook_url=inbox.url)` to point a user at it."""
+    inbox = FakeInbox()
+    yield inbox
+    inbox.close()
+
+
+@pytest.fixture
+def make_inbox():
+    """Factory when a test needs several bots, each with its own inbox."""
+    inboxes: list[FakeInbox] = []
+
+    def _make() -> FakeInbox:
+        inbox = FakeInbox()
+        inboxes.append(inbox)
+        return inbox
+
+    yield _make
+    for inbox in inboxes:
+        inbox.close()
