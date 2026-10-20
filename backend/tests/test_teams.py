@@ -3,7 +3,7 @@ import json
 from uuid import uuid4
 
 import pytest
-from conftest import ToolError, register_args
+from conftest import NO_AUTH, ToolError, register_args
 from sqlmodel import Session, select
 
 from app.db import engine
@@ -210,7 +210,7 @@ def test_transport_exception_is_unknown_and_other_recipient_completes(
 
 def test_rest_and_mcp_share_team_rules(client, mcp, network):
     handles, _, tokens, _ = network
-    assert client.post("/api/teams", json={"name": "REST team"}).status_code == 401
+    assert client.post("/api/teams", json={"name": "REST team"}, headers=NO_AUTH).status_code == 401
     assert (
         client.post(
             "/api/teams", headers={"Authorization": "Bearer invalid"}, json={"name": "No"}

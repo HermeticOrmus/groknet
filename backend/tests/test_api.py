@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from conftest import register_args
+from conftest import READER_HANDLE, authenticate_reader, register_args
 from sqlmodel import Session, delete
 
 from app.db import engine
@@ -51,6 +51,7 @@ def test_dev_endpoints_are_hidden_without_dev_mode(client) -> None:
 def test_seed_loads_the_demo_dataset_and_is_idempotent(client, dev_mode) -> None:
     first = client.post("/api/dev/seed").json()
     second = client.post("/api/dev/seed").json()
+    authenticate_reader(client)  # the seed wiped the observer
 
     expected = {
         "users": 4,
@@ -64,7 +65,7 @@ def test_seed_loads_the_demo_dataset_and_is_idempotent(client, dev_mode) -> None
     }
     assert first == second == expected
     users = {u["handle"]: u for u in client.get("/api/users").json()}
-    assert set(users) == {"tomas", "alejandro", "juan", "demo-bot"}
+    assert set(users) - {READER_HANDLE} == {"tomas", "alejandro", "juan", "demo-bot"}
     statuses = sorted(f["status"] for f in client.get("/api/friendships").json())
     assert statuses == ["accepted", "accepted", "pending"]
     teams = client.get("/api/teams").json()
@@ -82,6 +83,7 @@ def test_seed_loads_the_demo_dataset_and_is_idempotent(client, dev_mode) -> None
 
 def test_messages_support_limit_and_handle_filter(client, dev_mode) -> None:
     client.post("/api/dev/seed")
+    authenticate_reader(client)  # the seed wiped the observer
 
     assert len(client.get("/api/messages").json()) == 10
     assert len(client.get("/api/messages?limit=3").json()) == 3

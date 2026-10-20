@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, or_, select
 
 from app import config, dev
+from app.auth import current_actor
 from app.db import get_session
 from app.events import bus
 from app.models import Friendship, Message, User
@@ -24,6 +25,8 @@ from app.teams import list_teams as read_teams
 
 router = APIRouter(prefix="/api")
 SessionDep = Annotated[Session, Depends(get_session)]
+# Reads are for signed-in humans (session cookie) or bots/scripts (bearer token). /health stays open.
+reader = [Depends(current_actor)]
 
 
 @router.get("/health")
@@ -31,7 +34,7 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "groknet"}
 
 
-@router.get("/users")
+@router.get("/users", dependencies=reader)
 def list_users(session: SessionDep) -> list[dict]:
     # Never groknet_token, webhook_url or webhook_key.
     return [
@@ -48,12 +51,12 @@ def list_users(session: SessionDep) -> list[dict]:
     ]
 
 
-@router.get("/friendships")
+@router.get("/friendships", dependencies=reader)
 def list_friendships(session: SessionDep) -> list[Friendship]:
     return list(session.exec(select(Friendship).order_by(Friendship.created_at)).all())
 
 
-@router.get("/messages")
+@router.get("/messages", dependencies=reader)
 def list_messages(
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=1000)] = 200,
@@ -66,12 +69,12 @@ def list_messages(
     return list(session.exec(stmt).all())
 
 
-@router.get("/teams")
+@router.get("/teams", dependencies=reader)
 def list_teams(session: SessionDep) -> list[dict]:
     return read_teams(session)
 
 
-@router.get("/events")
+@router.get("/events", dependencies=reader)
 async def events() -> StreamingResponse:
     q = bus.subscribe()
 

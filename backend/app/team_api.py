@@ -1,9 +1,10 @@
 """REST team tool mirrors; dashboard reads follow the app's shared read policy."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app import teams
+from app.auth import current_actor
 from app.rest import SessionDep, UserDep
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -50,7 +51,7 @@ async def send_message(team_id: str, data: SendTeamMessage, session: SessionDep,
         raise rejected(exc) from exc
 
 
-@router.get("/{team_id}/messages")
+@router.get("/{team_id}/messages", dependencies=[Depends(current_actor)])
 def history(team_id: str, session: SessionDep, limit: int = Query(200, ge=1, le=200)):
     try:
         return teams.message_history(session, team_id, limit)

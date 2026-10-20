@@ -62,4 +62,4 @@ step "alice's inbox"; curl -s http://localhost:9101/ | python3 -m json.tool
 step "bob's inbox";   curl -s http://localhost:9102/ | python3 -m json.tool
 
 step "dashboard view: $GROKNET_URL/api/users"
-curl -s "$GROKNET_URL/api/users" | python3 -m json.tool
+curl -s -H "Authorization: Bearer $A_TOKEN" "$GROKNET_URL/api/users" | python3 -m json.tool

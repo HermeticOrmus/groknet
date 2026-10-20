@@ -4,7 +4,7 @@ import json
 from uuid import uuid4
 
 import pytest
-from conftest import ToolError, register_args
+from conftest import NO_AUTH, ToolError, register_args
 from sqlmodel import Session, delete
 
 from app import config
@@ -71,7 +71,8 @@ def login_cookie(client, crew, role: str) -> dict[str, str]:
     assert resp.status_code == 200, resp.text
     value = resp.cookies["groknet_session"]
     client.cookies.clear()
-    return {"Cookie": f"groknet_session={value}"}
+    # Drop the default test bearer so the cookie is the actor.
+    return {"Cookie": f"groknet_session={value}", **NO_AUTH}
 
 
 def new_project(client, crew, role="owner", **body):
@@ -106,11 +107,11 @@ def inbox_types(crew, role, prefix="issue_") -> list[str]:
 
 
 def test_no_actor_is_401_and_bad_credentials_are_401(client, crew):
-    assert client.get("/api/projects").status_code == 401
+    assert client.get("/api/projects", headers=NO_AUTH).status_code == 401
     body = {"team_id": crew["team_id"], "name": "x"}
-    assert client.post("/api/projects", json=body).status_code == 401
+    assert client.post("/api/projects", json=body, headers=NO_AUTH).status_code == 401
     assert client.get("/api/projects", headers=bearer("nope")).status_code == 401
-    forged = {"Cookie": "groknet_session=forged.not-signed"}
+    forged = {"Cookie": "groknet_session=forged.not-signed", **NO_AUTH}
     assert client.get("/api/projects", headers=forged).status_code == 401
 
 

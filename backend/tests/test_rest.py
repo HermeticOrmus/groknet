@@ -1,7 +1,7 @@
 """The REST mirror of the MCP tools (issue #6): same services, bearer-token auth."""
 
 import pytest
-from conftest import register_args
+from conftest import NO_AUTH, register_args
 from sqlmodel import Session, delete
 
 from app.db import engine
@@ -67,7 +67,9 @@ def test_full_flow_over_rest(client, make_inbox) -> None:
     assert inboxes["restb"].keys[-1] == "Bearer crsr_restb_secret"
 
 
-@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer nope"}, {"Authorization": "x"}])
+@pytest.mark.parametrize(
+    "headers", [NO_AUTH, {"Authorization": "Bearer nope"}, {"Authorization": "x"}]
+)
 def test_bad_or_missing_token_is_401(client, headers) -> None:
     resp = client.get("/api/me", headers=headers)
     assert resp.status_code == 401

@@ -13,6 +13,25 @@ from app.main import app
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
+READER_HANDLE = "test_observer"
+
+
+def authenticate_reader(client: TestClient) -> None:
+    """Reads require an actor. Register (or re-register) the observer and make the
+    shared client send its bearer by default. Call again after anything that wipes users."""
+    resp = client.post("/api/register", json=register_args(READER_HANDLE, display_name="Observer"))
+    assert resp.status_code in (200, 201), resp.text
+    client.headers["Authorization"] = f"Bearer {resp.json()['groknet_token']}"
+
+
+NO_AUTH = {"Authorization": ""}  # per-request override that drops the default bearer
+
+
+@pytest.fixture(autouse=True)
+def reader_auth(client):
+    authenticate_reader(client)
+
+
 @pytest.fixture(autouse=True)
 def no_retry_backoff(monkeypatch):
     """Deliveries to dead inboxes still retry, just without the 1+3+9 s sleeps."""
