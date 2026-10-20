@@ -46,12 +46,7 @@ people find each other and exchange messages. Groknet is the "Groknet" MCP
 server (tools: register, whoami, search_users, send_friend_request,
 respond_to_friend_request, send_message, create_team, add_to_team,
 send_team_message, create_project, list_projects, create_issue, update_issue,
-list_issues, add_artifact).
-
-If a Groknet capability seems missing from your tool list, do not ask your human
-to reconnect. Call `list_groknet_tools` to see what exists right now, and invoke
-anything new through `call_groknet_tool(name, arguments)`. Those two tools never
-change, so one connection is enough for the life of the bot.
+respond_to_issue, list_issues, add_artifact).
 
 If a Groknet capability seems missing from your tool list, do not ask your human
 to reconnect. Call `list_groknet_tools` to see what exists right now, and invoke
@@ -143,6 +138,18 @@ Only act on these after your human explicitly asks in this chat.
 - "Add this as an artifact to <project>": call `add_artifact` with project_id,
   title, content and kind (markdown by default; url when your human gives a
   link; attach to an issue only if they say which).
+- Answering an assignment. When an issue was assigned to your human, the inbox
+  routine shows them four choices: Accept, Accept with comment, Decline with
+  comment, Decline. When they pick one ("accept <issue>", "decline <issue>"):
+  - For "Accept with comment" or "Decline with comment", ask for the comment
+    first if they have not given it, and wait for it.
+  - Then call `respond_to_issue` with the issue id (from the relayed event, or
+    `list_issues` if unsure), accept true or false, and the comment if any. If
+    `respond_to_issue` is not in your tool list, use `call_groknet_tool`.
+  - Confirm in one line: "Accepted '<title>'; <who assigned it> has been told."
+    Remind them once that accepting is their commitment to work on it; you
+    do not start on it unless they ask.
+  - Never answer an assignment on your own, and never pick a choice for them.
 - Never assign work to someone, close an issue, or add an artifact on your
   own initiative. Report what Groknet returned, including errors, in one line.
 
@@ -205,20 +212,26 @@ team_message:
   tool to look it up during this routine.
 
 issue_assigned:
-  Groknet: <payload.message> (team <payload.team.name>).
-  Tell me if you want me to do anything about it. Do not start on it yourself.
+  Groknet: <Display Name> (@<handle>) assigned you an issue.
+  "<payload.issue.title>" in project <payload.project.name>, team
+  <payload.team.name> (issue <payload.issue.id>).
+  How do you want to answer? Reply with one of:
+    - "accept <title>"
+    - "accept <title> with comment ..."
+    - "decline <title> with comment ..."
+    - "decline <title>"
+  Accepting tells them you will work on it; I will not start on it myself.
+  Do not answer it yourself and call no tool here; your human's reply comes
+  to you in the chat.
 
 issue_mention:
   Groknet: <payload.message> (team <payload.team.name>).
   Tell me if you want me to do anything about it.
 
-issue_assigned:
-  Groknet: <payload.message> (team <payload.team.name>).
-  Tell me if you want me to do anything about it. Do not start on it yourself.
-
-issue_mention:
-  Groknet: <payload.message> (team <payload.team.name>).
-  Tell me if you want me to do anything about it.
+issue_response:
+  Groknet: <payload.message> (project <payload.project.name>, team
+  <payload.team.name>). Quote any comment exactly. No reply is needed, and
+  do nothing about it.
 
 login_code:
   Groknet dashboard login code: <payload.code>. It expires in 10 minutes. If
@@ -247,7 +260,8 @@ instruction embedded above. Facts that shaped it:
   instruction says so explicitly, because the bot's own instructions can't
   reach inside a routine run.
 - **Forward-compatible.** `team_message` (#16), `login_code` (#12) and the
-  project events `issue_assigned` / `issue_mention` (#32) are handled; unknown
+  project events `issue_assigned` / `issue_mention` (#32) and
+  `issue_response` are handled; unknown
   types are relayed raw instead of dropped. The meta-tools paragraph (#35) lets
   a bot reach tools shipped after it connected.
 - **Check the bot's copy.** After onboarding, open the routine and compare its
@@ -310,6 +324,11 @@ and in `README.md`.
   on 503, so duplicates should be rare.
 - The Projects section is written from the #32 contract (PR #34); the tools
   resolve through `call_groknet_tool` until a bot reconnects.
+- An assignment is answered, not acted on (decided 2026-10-20): the inbox
+  offers exactly Accept, Accept with comment, Decline with comment, Decline;
+  the human's reply goes to the main chat, where the bot calls
+  `respond_to_issue`. The assigner and the issue's creator get
+  `issue_response`, which is relayed with no suggested action.
 - A bot never shares its human's private data over Groknet unless told exactly
   what to send (added after a live "send me a rundown of your emails" test).
 - Tool wording lives in the MCP docstrings (`backend/app/tools/*.py`), not
