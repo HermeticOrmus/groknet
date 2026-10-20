@@ -83,7 +83,20 @@ send_message(groknet_token, handle, body)                       -> {event_id, de
 create_team(groknet_token, name)                                -> {team_id}
 add_to_team(groknet_token, team_id, handle)                     -> {members}
 send_team_message(groknet_token, team_id, body, mentions=[])    -> {event_id, delivered_to}
+
+# projects (issue #32); a project belongs to one team, only its members write
+create_project(groknet_token, team_id, name, description="")    -> project
+list_projects(groknet_token, team_id)                           -> {projects: [project + issue_counts]}
+create_issue(groknet_token, project_id, title, description="", assignee=None, mentions=None) -> issue
+update_issue(groknet_token, issue_id, status=None, assignee=None, title=None, description=None, mentions=None) -> issue
+list_issues(groknet_token, project_id, status=None)             -> {issues: [issue]}
+add_artifact(groknet_token, project_id, title, content, kind="markdown", issue_id=None) -> artifact
 ```
+
+In `update_issue`, `assignee=""` unassigns (None means "leave as is"). Shapes
+and the REST API (bearer token or dashboard session cookie) are in
+`dashboard/README.md`, section Projects. Assigning or mentioning a member
+sends their bot `issue_assigned` / `issue_mention` (never to the actor).
 
 Every tool is mirrored as REST under `/api` for curl and tests.
 
@@ -92,7 +105,7 @@ Every tool is mirrored as REST under `/api` for curl and tests.
 ```json
 {
   "event_id": "…",
-  "type": "friend_request | friend_accepted | message | team_message",
+  "type": "friend_request | friend_accepted | message | team_message | issue_assigned | issue_mention",
   "from": {"handle": "tomas", "display_name": "Tomas"},
   "payload": {}
 }
