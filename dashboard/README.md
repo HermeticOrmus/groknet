@@ -140,7 +140,12 @@ the `event_id` on the corresponding `delivery` event.
     "name": "Groknet core",
     "created_by": "tomas",
     "created_at": "2026-10-19T21:20:00Z",
-    "members": ["alejandro", "juan", "tomas"]
+    "members": ["alejandro", "juan", "tomas"],
+    "member_details": [
+      {"handle": "alejandro", "display_name": "Alejandro"},
+      {"handle": "juan", "display_name": "Juan"},
+      {"handle": "tomas", "display_name": "Tomas"}
+    ]
   }
 ]
 ```
@@ -166,6 +171,90 @@ plain `EventSource`; there is no replay, load history from the endpoints above.
 
 `from` and `to` are handles. One `message` or `team_message` event is followed
 by one `delivery` event per recipient bot, correlated by `event_id`. Render a
-failed delivery (`ok: false`) loudly: it means a human did not get the message.
+delivery result visibly. A confirmed receipt means the webhook accepted the
+request, not that a human read or approved it. A timeout can leave acceptance
+unknown.
 
 Try any of them without bots: `curl -X POST localhost:8000/api/dev/emit -H 'Content-Type: application/json' -d '{"type":"delivery","ok":false,"status":503}'`.
+
+## Team APIs (#15–#17)
+
+Team messaging shares the existing backend and event bus. The dashboard UI
+implementation is deferred under #18. `member_details` is an additive field;
+legacy `members` handle arrays remain compatible.
+
+MCP tools are `create_team(groknet_token, name)`,
+`add_to_team(groknet_token, team_id, handle)`, and
+`send_team_message(groknet_token, team_id, body, mentions=[])`. A creator is the
+first member. Adding a member requires the caller's accepted friendship; all
+mentions must be team members. Fan-out goes to every member except the sender.
+
+Their REST mirrors require `Authorization: Bearer <groknet_token>`:
+
+| Method/path | JSON body | Result |
+| --- | --- | --- |
+| POST `/api/teams` | `{ "name": "Demo" }` | `{ "team_id": "..." }` |
+| POST `/api/teams/{id}/members` | `{ "handle": "alejandro" }` | `{ "members": ["alejandro", "juan"] }` |
+| POST `/api/teams/{id}/messages` | `{ "body": "Hi @alejandro", "mentions": ["alejandro"] }` | `{ "event_id": "...", "delivered_to": ["alejandro"] }` |
+
+Read errors/mutation errors are JSON `detail` responses: 401 for missing or
+invalid bearer identity, 403 for membership/friendship violations, 404 for a
+missing team/user, and 400 for rejected team/message inputs. Read endpoints
+inherit the shared app's read/session policy; this slice does not implement #12.
+
+### GET `/api/teams/{id}/messages?limit=200`
+
+Returns the most recent `limit` messages (1–200), ordered oldest first:
+
+```json
+[{"id":"message-id","event_id":"event-id","sender":"juan","sender_name":"Juan",
+  "recipient":null,"team_id":"team-id","body":"Hi @alejandro","mentions":["alejandro"],
+  "delivered":true,"created_at":"2026-10-19T23:00:00Z",
+  "deliveries":[{"recipient":"alejandro","status":"delivered","revision":2,
+                 "updated_at":"2026-10-19T23:00:01Z"}]}]
+```
+
+`delivered_to` contains confirmed recipients only. A message's legacy aggregate
+`delivered` flag cannot describe partial delivery; use `deliveries`. Receipts
+are persisted with the original recipient snapshot, so adding a member later
+does not add them to old messages. Statuses are `pending`, `delivered`, `failed`
+(definitive rejection), and `unknown` (including uncertain transport outcomes).
+Each starts at revision 1 and settles at revision 2. No team-level automatic
+resend is added on top of the shared sender's retry policy.
+
+### Team SSE events
+
+- `team_created`: `{ "type":"team_created", "team_id":"..." }`
+- `team_member_added`: `{ "type":"team_member_added", "team_id":"...", "handle":"..." }`
+- `team_message`: the normalized history message above with `type`, plus legacy
+  `from` (sender handle) and `team: {id,name}` fields. It is published before
+  dispatch, with pending recipient receipts.
+- Team `delivery`: `{ "type":"delivery", "event_type":"team_message", "event_id":"...",
+  "team_id":"...", "to":"alejandro", "delivery_status":"delivered", "revision":2,
+  "updated_at":"...", "ok":true, "status":200 }`. `status` is the final HTTP
+  status or null; `delivery_status` carries the outcome to render.
+
+Correlate by `(event_id, recipient)` and retain the higher receipt revision when
+reconciling snapshots with SSE. Open SSE before loading history; buffer delivery
+updates received before their message. On reconnect reload both roster and
+selected-channel history. Dashboard consumers should reuse the global shell's SSE stream. Render inbound
+message bodies as text. The deferred UI remains responsible for its own
+reconnect and snapshot reconciliation behavior.
+
+### Verification and bot instructions
+
+```bash
+cd backend
+uv sync --frozen --python 3.13
+cd ..
+bin/prove
+```
+
+The gate runs Ruff, Python compilation, and backend REST/MCP integration tests
+with local fake webhook inboxes. `typecheck=NA` is explicit because the project
+has no configured static type checker. Fake inboxes do not establish real Grok
+approval behavior.
+
+[bot-teams.md](../docs/bot-teams.md) contains the copyable team extension and
+real-bot smoke steps for the base template owned by the bot-template track.
+The live bot/template check remains separate from the backend test result.

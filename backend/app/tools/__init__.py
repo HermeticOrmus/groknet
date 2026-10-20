@@ -4,4 +4,5 @@ from app.tools import (
     friendships,  # noqa: F401
     identity,  # noqa: F401
     messaging,  # noqa: F401
+    teams,  # noqa: F401
 )
