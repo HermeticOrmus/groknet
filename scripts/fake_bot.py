@@ -26,6 +26,11 @@ def main() -> None:
     ap.add_argument("name", help="bot name; the expected bearer key is crsr_<name>")
     ap.add_argument("port", type=int)
     ap.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="bind address; use 0.0.0.0 when the backend runs in Docker and reaches you via the bridge gateway",
+    )
+    ap.add_argument(
         "--fail",
         default="",
         help="comma-separated status codes to return for the first requests, e.g. 503,503 or 401",
@@ -92,9 +97,9 @@ def main() -> None:
         def log_message(self, *_: object) -> None:
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(
-        f"fake bot {args.name!r} listening on http://localhost:{args.port}/automations/webhook/{args.name}"
+        f"fake bot {args.name!r} listening on http://{args.host}:{args.port}/automations/webhook/{args.name}"
         f"  (key crsr_{args.name})",
         flush=True,
     )
