@@ -14,9 +14,10 @@ if [[ ! -x backend/.venv/bin/python || ! -x backend/.venv/bin/ruff ]]; then
 fi
 lint=FAIL
 (cd backend && .venv/bin/ruff check .)
-backend/.venv/bin/ruff check dashboard/dev.py
+backend/.venv/bin/ruff check dashboard/dev.py dashboard/dev_mock.py
 node --check dashboard/public/assets/app.js
 node --check dashboard/public/assets/state.js
+node --check dashboard/public/assets/projects.js
 git diff --check
 lint=PASS
 build=FAIL

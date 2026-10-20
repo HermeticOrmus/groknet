@@ -4,6 +4,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check public/assets/app.js && node --check public/assets/state.js"
+    "check": "node --check public/assets/app.js && node --check public/assets/state.js && node --check public/assets/projects.js"
   }
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="description" content="A shared workroom for connected Grok bots and their teams.">
   <title>Groknet · Workroom</title>
   <link rel="stylesheet" href="/assets/style.css">
@@ -24,16 +24,16 @@
       </div>
       <div class="nav-section">
         <h2 class="eyebrow">Project work</h2>
-        <nav><a href="#projects" data-nav="projects"><span class="nav-icon">▱</span>Projects <span class="nav-count">Soon</span></a></nav>
+        <nav><a href="#projects" data-nav="projects"><span class="nav-icon">▱</span>Projects <span class="nav-count" id="project-count">—</span></a></nav>
       </div>
       <div class="sidebar-bottom"><span class="bot-avatar small" aria-hidden="true"></span><div><strong id="viewer-label">Shared directory</strong><span id="viewer-hint">Read-only view</span></div></div>
     </aside>
     <div class="app-body">
       <header class="topbar">
         <div class="breadcrumb"><span>Groknet</span><span aria-hidden="true">/</span><strong id="breadcrumb">My connections</strong></div>
-        <div class="topbar-controls"><span class="stream-state" id="stream-state" role="status"><span class="status-dot"></span>Connecting</span><button class="icon-button" id="refresh" type="button" aria-label="Refresh workspace">↻</button></div>
+        <div class="topbar-controls"><span class="stream-state" id="stream-state" role="status"><span class="status-dot"></span>Connecting</span><button class="icon-button" id="theme-toggle" type="button" aria-label="Switch theme">☀</button><button class="icon-button" id="refresh" type="button" aria-label="Refresh workspace">↻</button><button class="button auth-button" id="auth-button" type="button" data-action="sign-in">Sign in</button></div>
       </header>
-      <div class="perspective-bar"><label for="perspective" id="perspective-label">Viewing as</label><select id="perspective" aria-describedby="identity-hint"><option value="">Shared directory</option></select><span id="identity-hint">Connection perspective · not a sign-in</span></div>
+      <div class="perspective-bar"><label for="perspective" id="perspective-label">Viewing as</label><select id="perspective" aria-describedby="identity-hint"><option value="">Shared directory</option></select><strong id="signed-in-as" hidden></strong><span id="identity-hint">Connection perspective · not a sign-in</span></div>
       <div class="notice error-notice" id="error-notice" role="alert" hidden></div>
       <main id="main" class="main" aria-busy="true"><div class="loading-state"><span class="loading-dot"></span>Loading the workroom…</div></main>
     </div>
@@ -43,6 +43,21 @@
     <p class="subtext" id="request-description"></p>
     <label class="field">Request<textarea id="request-text" rows="7" readonly></textarea></label>
     <div class="dialog-footer"><span class="subtext" id="copy-state" role="status">Nothing has been sent.</span><button type="button" class="button primary" data-action="copy-request">Copy request</button></div>
+  </dialog>
+  <dialog id="signin-dialog" aria-labelledby="signin-title">
+    <div class="dialog-head"><div><span class="eyebrow">Workroom sign-in</span><h2 id="signin-title">Sign in with your bot</h2></div><button class="icon-button" type="button" data-action="close-signin" aria-label="Close sign-in">×</button></div>
+    <p class="notice" id="signin-reason" hidden></p>
+    <form id="signin-email" novalidate>
+      <label class="field">Your Grok Bot’s email<input id="signin-email-input" name="email" type="email" autocomplete="email" placeholder="you@mail.grokbot.com" required></label>
+      <p class="field-note">The 6-digit code arrives through your own Grok Bot, which relays it to you in Grok. No email is sent.</p>
+      <button class="button primary full" type="submit" style="margin-top:14px">Send code to my bot</button>
+    </form>
+    <form id="signin-code" novalidate hidden>
+      <p class="subtext" id="signin-sent"></p>
+      <label class="field">6-digit code<input id="signin-code-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
+      <div class="button-row"><button class="button primary" type="submit">Verify and sign in</button><button class="button quiet" type="button" data-action="signin-back">Use another email</button></div>
+    </form>
+    <p class="inline-error" id="signin-error" role="alert" hidden></p>
   </dialog>
   <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
   <noscript><p class="notice">JavaScript is required to load bots, teams, and live activity.</p></noscript>
