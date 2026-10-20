@@ -8,6 +8,7 @@ from app.api import router as api_router
 from app.auth import router as auth_router
 from app.db import init_db
 from app.mcp_server import mcp
+from app.projects_api import router as projects_router
 from app.rest import EXCEPTION_HANDLERS
 from app.rest import router as rest_router
 from app.team_api import router as team_router
@@ -37,6 +38,7 @@ app = FastAPI(
 )
 app.include_router(api_router)
 app.include_router(team_router)
+app.include_router(projects_router)
 app.include_router(auth_router)
 app.include_router(rest_router)
 # Mounted last and at the root so /mcp is matched exactly; /api routes above win first.

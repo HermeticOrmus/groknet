@@ -10,7 +10,8 @@ POST /api/auth/verify {email, code}  -> 200 {handle, display_name, email} + sess
 GET  /api/auth/me                    -> same shape, or 401
 POST /api/auth/logout                -> clears the cookie
 
-`current_dashboard_user` is the dependency other routers use to require a session.
+`current_dashboard_user` is the dependency other routers use to require a session;
+`current_actor` accepts a bearer groknet_token or the session (projects, issue #32).
 """
 
 import hashlib
@@ -21,18 +22,21 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app import config, webhooks
 from app.db import get_session
+from app.errors import AuthError
 from app.events import bus
 from app.models import LoginCode, User, now
-from app.registry import ALLOWED_EMAIL_DOMAIN
+from app.registry import ALLOWED_EMAIL_DOMAIN, require_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 SessionDep = Annotated[Session, Depends(get_session)]
+_bearer = HTTPBearer(auto_error=False)
 
 COOKIE_NAME = "groknet_session"
 SESSION_MAX_AGE_S = 7 * 24 * 3600
@@ -146,18 +150,38 @@ def verify(body: VerifyBody, response: Response, session: SessionDep) -> dict[st
     return _public(user)
 
 
+def _session_user(request: Request, session: Session) -> User | None:
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        return None
+    try:
+        handle = _signer.loads(token, max_age=SESSION_MAX_AGE_S)
+    except BadSignature:
+        return None
+    return session.get(User, handle) if handle else None
+
+
 def current_dashboard_user(request: Request, session: SessionDep) -> User:
     """Dependency: the logged-in dashboard human, or 401."""
-    token = request.cookies.get(COOKIE_NAME)
-    if token:
-        try:
-            handle = _signer.loads(token, max_age=SESSION_MAX_AGE_S)
-        except BadSignature:
-            handle = None
-        user = session.get(User, handle) if handle else None
-        if user is not None:
-            return user
-    raise HTTPException(401, "Not logged in.")
+    user = _session_user(request, session)
+    if user is None:
+        raise HTTPException(401, "Not logged in.")
+    return user
+
+
+def current_actor(
+    request: Request,
+    session: SessionDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User:
+    """Dependency: a bot or script by `Authorization: Bearer <groknet_token>`, else the
+    dashboard human by session cookie, else 401. A bearer, when sent, must be valid."""
+    if credentials is not None:
+        return require_user(session, credentials.credentials)
+    user = _session_user(request, session)
+    if user is None:
+        raise AuthError("Log in to the dashboard or send Authorization: Bearer <groknet_token>.")
+    return user
 
 
 @router.get("/me")

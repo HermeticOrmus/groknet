@@ -9,7 +9,19 @@ from typing import Any
 from sqlmodel import Session, delete
 
 from app.events import bus
-from app.models import Friendship, FriendshipStatus, Message, Team, TeamMember, User, new_id, now
+from app.models import (
+    Artifact,
+    Friendship,
+    FriendshipStatus,
+    Issue,
+    Message,
+    Project,
+    Team,
+    TeamMember,
+    User,
+    new_id,
+    now,
+)
 from app.team_models import TeamDelivery
 
 SEED_USERS = [
@@ -66,10 +78,28 @@ SEED_MESSAGES = [
     ("tomas", "alejandro", "Agreed, borrow the look, not the runtime."),
 ]
 
+# (title, status, assignee, comma-separated mentions, created_by)
+SEED_ISSUES = [
+    ("Write the demo script", "done", "alejandro", "tomas", "tomas"),
+    ("Projects board in the dashboard", "in_progress", "alejandro", "juan", "tomas"),
+    ("Issue webhooks in the inbox routine", "open", "juan", "", "alejandro"),
+    ("Record a backup demo video", "open", None, "alejandro,juan", "juan"),
+]
+
 
 def seed(session: Session) -> dict[str, int]:
     """Wipe and recreate the demo dataset. Idempotent."""
-    for table in (TeamDelivery, Message, TeamMember, Team, Friendship, User):
+    for table in (
+        Artifact,
+        Issue,
+        Project,
+        TeamDelivery,
+        Message,
+        TeamMember,
+        Team,
+        Friendship,
+        User,
+    ):
         session.exec(delete(table))
     session.commit()
 
@@ -113,6 +143,59 @@ def seed(session: Session) -> dict[str, int]:
     session.add(Team(id=team_id, name="Groknet core", created_by="tomas"))
     for handle in ("tomas", "alejandro", "juan"):
         session.add(TeamMember(team_id=team_id, user_handle=handle))
+
+    project_id = new_id()
+    t1 = t0 + timedelta(minutes=70)
+    session.add(
+        Project(
+            id=project_id,
+            team_id=team_id,
+            name="Hackathon demo",
+            description="Everything we need on stage: the bot handshake, teams, and projects.",
+            created_by="tomas",
+            created_at=t1,
+            updated_at=t1,
+        )
+    )
+    issue_ids = [new_id() for _ in SEED_ISSUES]
+    for i, (issue_id, (title, status, assignee, mentions, by)) in enumerate(
+        zip(issue_ids, SEED_ISSUES, strict=True)
+    ):
+        at = t1 + timedelta(minutes=2 + i * 3)
+        session.add(
+            Issue(
+                id=issue_id,
+                project_id=project_id,
+                title=title,
+                status=status,
+                assignee=assignee,
+                mentions=mentions,
+                created_by=by,
+                created_at=at,
+                updated_at=at,
+            )
+        )
+    session.add(
+        Artifact(
+            project_id=project_id,
+            issue_id=issue_ids[0],
+            title="Demo script",
+            kind="markdown",
+            content="# Demo script\n\n1. Register two bots.\n2. Befriend.\n3. Relay a message.",
+            created_by="alejandro",
+            created_at=t1 + timedelta(minutes=20),
+        )
+    )
+    session.add(
+        Artifact(
+            project_id=project_id,
+            title="Repository",
+            kind="url",
+            content="https://github.com/sudoTomas/groknet",
+            created_by="tomas",
+            created_at=t1 + timedelta(minutes=21),
+        )
+    )
     session.commit()
 
     return {
@@ -121,6 +204,9 @@ def seed(session: Session) -> dict[str, int]:
         "messages": len(SEED_MESSAGES),
         "teams": 1,
         "team_members": 3,
+        "projects": 1,
+        "issues": len(SEED_ISSUES),
+        "artifacts": 2,
     }
 
 
@@ -142,6 +228,44 @@ FAKE_EVENTS: dict[str, dict[str, Any]] = {
         "team": {"id": "seed-team", "name": "Groknet core"},
         "body": "Team, the demo is live.",
         "mentions": ["juan"],
+    },
+    "project_created": {
+        "project": {"id": "seed-project", "name": "Hackathon demo"},
+        "team_id": "seed-team",
+        "by": "tomas",
+    },
+    "project_updated": {
+        "project_id": "seed-project",
+        "team_id": "seed-team",
+        "by": "tomas",
+        "changes": ["status"],
+    },
+    "issue_created": {
+        "issue": {
+            "id": "seed-issue",
+            "title": "Write the demo script",
+            "status": "open",
+            "assignee": "alejandro",
+        },
+        "project_id": "seed-project",
+        "team_id": "seed-team",
+        "by": "tomas",
+    },
+    "issue_updated": {
+        "issue_id": "seed-issue",
+        "project_id": "seed-project",
+        "team_id": "seed-team",
+        "by": "alejandro",
+        "changes": ["status"],
+        "status": "in_progress",
+        "assignee": "alejandro",
+    },
+    "artifact_added": {
+        "artifact": {"id": "seed-artifact", "title": "Demo script", "kind": "markdown"},
+        "project_id": "seed-project",
+        "issue_id": "seed-issue",
+        "team_id": "seed-team",
+        "by": "alejandro",
     },
     "delivery": {
         "event_id": "seed-evt-1",

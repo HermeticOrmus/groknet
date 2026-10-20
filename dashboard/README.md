@@ -332,3 +332,84 @@ approval behavior.
 [bot-teams.md](../docs/bot-teams.md) contains the copyable team extension and
 real-bot smoke steps for the base template owned by the bot-template track.
 The live bot/template check remains separate from the backend test result.
+
+## Projects (#32)
+
+A project belongs to exactly one team. Any authenticated actor reads; only
+members of the project's team write. Every endpoint below accepts **either**
+the dashboard's `groknet_session` cookie (sent with `credentials: 'same-origin'`)
+**or** `Authorization: Bearer <groknet_token>`. Errors are JSON
+`{"detail": "..."}`: 400 invalid input, 401 no or invalid actor, 403 not a
+member of the project's team, 404 unknown project, issue, team or artifact
+`issue_id`. Timestamps are UTC ISO strings with microseconds and a `Z` suffix,
+so they also sort as strings. Lists are oldest first.
+
+| Method/path | JSON body | Result |
+| --- | --- | --- |
+| GET `/api/projects?team_id=` | | `[project + issue_counts]` (`team_id` optional) |
+| POST `/api/projects` | `{team_id, name, description?}` | 201 project |
+| GET `/api/projects/{id}` | | project detail (below) |
+| PATCH `/api/projects/{id}` | `{name?, description?, status?}` | project |
+| GET `/api/projects/{id}/issues?status=` | | `[issue]` |
+| POST `/api/projects/{id}/issues` | `{title, description?, assignee?, mentions?}` | 201 issue |
+| PATCH `/api/issues/{id}` | `{title?, description?, status?, assignee?, mentions?}` | issue |
+| GET `/api/projects/{id}/artifacts` | | `[artifact]` |
+| POST `/api/projects/{id}/artifacts` | `{title, kind, content, issue_id?}` | 201 artifact |
+
+Shapes:
+
+```json
+// project; GET /api/projects adds "issue_counts": {"open": 2, "in_progress": 1, "done": 1}
+{"id":"p1","team_id":"t1","name":"Hackathon demo","description":"","status":"active",
+ "created_by":"tomas","created_at":"2026-10-19T23:00:00.000000Z",
+ "updated_at":"2026-10-19T23:05:00.000000Z"}
+
+// issue
+{"id":"i1","project_id":"p1","title":"Write the demo script","description":"",
+ "status":"open","assignee":"alejandro","mentions":["tomas"],"created_by":"tomas",
+ "created_at":"...","updated_at":"..."}
+
+// artifact
+{"id":"a1","project_id":"p1","issue_id":null,"title":"Repository","kind":"url",
+ "content":"https://github.com/sudoTomas/groknet","created_by":"tomas","created_at":"..."}
+
+// GET /api/projects/{id}
+{...project, "team": {"id":"t1","name":"Groknet core","members":["alejandro","juan","tomas"]},
+ "issues": [issue], "artifacts": [artifact]}
+```
+
+Rules: project `name` 1–100 chars, `status` `active|archived`. Issue `title`
+1–200 chars, `status` `open|in_progress|done` (any transition is allowed),
+`assignee` and `mentions` are bare handles of team members. PATCH sends only
+the fields that change; `"assignee": null` clears the assignee, `mentions`
+replaces the whole list. `updated_at` moves on every PATCH. Artifact `title`
+1–200 chars, `kind` `markdown|text|url`, `content` at most 50 KB, and a `url`
+must start with `http://` or `https://`; an `issue_id` must belong to the same
+project. Render artifact content as escaped text or sanitized markdown, and only
+link `url` artifacts.
+
+### Project SSE events
+
+- `project_created`: `{type, project: {id, name}, team_id, by}`
+- `project_updated`: `{type, project_id, team_id, by, changes: ["name", "status", ...]}`
+- `issue_created`: `{type, issue: {id, title, status, assignee}, project_id, team_id, by}`
+- `issue_updated`: `{type, issue_id, project_id, team_id, by, changes: [fields], status, assignee}`
+- `artifact_added`: `{type, artifact: {id, title, kind}, project_id, issue_id, team_id, by}`
+- `delivery` with `event_type` `issue_assigned` or `issue_mention`: the shared
+  delivery event (`event_id`, `to`, `ok`, `status`).
+
+`changes` lists only fields whose value actually changed (it can be empty).
+Refetch the open project's detail on any of these. Try them without bots:
+`curl -X POST localhost:8000/api/dev/emit -H 'Content-Type: application/json' -d '{"type":"issue_updated"}'`.
+`POST /api/dev/seed` adds one project on the seeded team with 4 issues across
+statuses and 2 artifacts (one markdown, one url).
+
+### Bot webhooks
+
+When an issue is created with, or changed to, a new assignee, that member's bot
+gets `issue_assigned`; each newly mentioned member gets `issue_mention`. The
+actor is never notified, and an assignee who is also mentioned gets only the
+assignment. Payload: `{issue: {id, title, status}, project: {id, name},
+team: {id, name}, message: "Tomas assigned you 'Write the demo script' in Hackathon demo"}`
+(mentions read "Tomas mentioned you in '...' in ..."). Delivery failures never
+fail the request.
