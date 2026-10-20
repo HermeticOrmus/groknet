@@ -2,7 +2,8 @@
 
 Same service functions as app/tools/*, so the rules are identical. Auth is
 `Authorization: Bearer <groknet_token>` instead of a `groknet_token` argument.
-A GroknetError becomes 400 {"detail": message}, an AuthError 401 (handlers in main.py).
+A GroknetError becomes 400 {"detail": message} (or its own `status_code`), an
+AuthError 401 (handlers in main.py).
 """
 
 from typing import Annotated, Any
@@ -107,7 +108,8 @@ async def send_message(
 
 
 def groknet_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    status = 401 if isinstance(exc, AuthError) else 400
+    # Feature errors may carry their own status (403 non-member, 404 unknown id).
+    status = 401 if isinstance(exc, AuthError) else getattr(exc, "status_code", 400)
     return JSONResponse(status_code=status, content={"detail": str(exc)})
 
 

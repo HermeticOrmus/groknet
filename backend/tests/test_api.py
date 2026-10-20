@@ -5,7 +5,16 @@ from conftest import register_args
 from sqlmodel import Session, delete
 
 from app.db import engine
-from app.models import Friendship, Message, Team, TeamMember, User
+from app.models import (
+    Artifact,
+    Friendship,
+    Issue,
+    Message,
+    Project,
+    Team,
+    TeamMember,
+    User,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -13,7 +22,7 @@ def _clean_tables_after_each_test():
     """These tests seed the shared test database; leave it empty for the other modules."""
     yield
     with Session(engine) as session:
-        for table in (Message, TeamMember, Team, Friendship, User):
+        for table in (Artifact, Issue, Project, Message, TeamMember, Team, Friendship, User):
             session.exec(delete(table))
         session.commit()
 
@@ -43,7 +52,16 @@ def test_seed_loads_the_demo_dataset_and_is_idempotent(client, dev_mode) -> None
     first = client.post("/api/dev/seed").json()
     second = client.post("/api/dev/seed").json()
 
-    expected = {"users": 4, "friendships": 3, "messages": 10, "teams": 1, "team_members": 3}
+    expected = {
+        "users": 4,
+        "friendships": 3,
+        "messages": 10,
+        "teams": 1,
+        "team_members": 3,
+        "projects": 1,
+        "issues": 4,
+        "artifacts": 2,
+    }
     assert first == second == expected
     users = {u["handle"]: u for u in client.get("/api/users").json()}
     assert set(users) == {"tomas", "alejandro", "juan", "demo-bot"}
@@ -52,6 +70,14 @@ def test_seed_loads_the_demo_dataset_and_is_idempotent(client, dev_mode) -> None
     teams = client.get("/api/teams").json()
     assert teams[0]["name"] == "Groknet core"
     assert teams[0]["members"] == ["alejandro", "juan", "tomas"]
+
+    seed_auth = {"Authorization": "Bearer seed-token-tomas"}
+    (project,) = client.get("/api/projects", headers=seed_auth).json()
+    assert project["team_id"] == teams[0]["id"]
+    assert project["issue_counts"] == {"open": 2, "in_progress": 1, "done": 1}
+    detail = client.get(f"/api/projects/{project['id']}", headers=seed_auth).json()
+    assert any(i["assignee"] and i["mentions"] for i in detail["issues"])
+    assert sorted(a["kind"] for a in detail["artifacts"]) == ["markdown", "url"]
 
 
 def test_messages_support_limit_and_handle_filter(client, dev_mode) -> None:
@@ -82,3 +108,18 @@ def test_emit_publishes_a_fake_event_on_the_bus(client, dev_mode) -> None:
     assert event["ok"] is False and event["status"] == 503
     assert event["to"] == "tomas"  # default filled from the fake-event template
     assert client.post("/api/dev/emit", json={}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("event_type", "keys"),
+    [
+        ("project_created", {"project", "team_id", "by"}),
+        ("project_updated", {"project_id", "team_id", "by", "changes"}),
+        ("issue_created", {"issue", "project_id", "team_id", "by"}),
+        ("issue_updated", {"issue_id", "project_id", "team_id", "by", "changes", "status"}),
+        ("artifact_added", {"artifact", "project_id", "issue_id", "team_id", "by"}),
+    ],
+)
+def test_emit_has_templates_for_project_events(client, dev_mode, event_type, keys) -> None:
+    event = client.post("/api/dev/emit", json={"type": event_type}).json()
+    assert keys <= set(event)

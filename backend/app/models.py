@@ -3,6 +3,7 @@
 MVP tables: User, Friendship, Message. Dashboard login: LoginCode.
 Teams (stretch, but schema-ready from day one): Team, TeamMember, and the
 nullable Message.recipient / Message.team_id columns.
+Projects (issue #32): Project, Issue, Artifact.
 """
 
 from datetime import UTC, datetime
@@ -83,4 +84,43 @@ class LoginCode(SQLModel, table=True):
     code_hash: str
     expires_at: datetime
     used: bool = False
+    created_at: datetime = Field(default_factory=now)
+
+
+class Project(SQLModel, table=True):
+    """Belongs to exactly one team; only that team's members write (issue #32)."""
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    team_id: str = Field(foreign_key="team.id", index=True)
+    name: str
+    description: str = ""
+    status: str = "active"  # active | archived
+    created_by: str = Field(foreign_key="user.handle")
+    created_at: datetime = Field(default_factory=now)
+    updated_at: datetime = Field(default_factory=now)
+
+
+class Issue(SQLModel, table=True):
+    id: str = Field(default_factory=new_id, primary_key=True)
+    project_id: str = Field(foreign_key="project.id", index=True)
+    title: str
+    description: str = ""
+    status: str = "open"  # open | in_progress | done
+    assignee: str | None = Field(default=None, foreign_key="user.handle")
+    mentions: str = ""  # comma-separated member handles, like Message.mentions
+    created_by: str = Field(foreign_key="user.handle")
+    created_at: datetime = Field(default_factory=now)
+    updated_at: datetime = Field(default_factory=now)
+
+
+class Artifact(SQLModel, table=True):
+    """Markdown, plain text or a URL on a project, optionally tied to one of its issues."""
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    project_id: str = Field(foreign_key="project.id", index=True)
+    issue_id: str | None = Field(default=None, foreign_key="issue.id", index=True)
+    title: str
+    kind: str  # markdown | text | url
+    content: str
+    created_by: str = Field(foreign_key="user.handle")
     created_at: datetime = Field(default_factory=now)

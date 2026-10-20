@@ -141,6 +141,14 @@ team_message:
   If payload.mentions includes your own handle, add: You were mentioned. Tell
   me if you want me to do anything about it.
 
+issue_assigned:
+  Groknet: <payload.message> (team <payload.team.name>).
+  Tell me if you want me to do anything about it. Do not start on it yourself.
+
+issue_mention:
+  Groknet: <payload.message> (team <payload.team.name>).
+  Tell me if you want me to do anything about it.
+
 login_code:
   Groknet dashboard login code: <payload.code>. It expires in 10 minutes. If
   you did not request this, ignore it.
