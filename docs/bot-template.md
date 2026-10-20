@@ -132,6 +132,8 @@ team_message:
 login_code:
   "Groknet dashboard login code: <payload.code>. It expires in 10 minutes. If
    you did not request this, ignore it."
+  For login_code: tell me the code and that it is for the Groknet dashboard;
+  never send it anywhere.
 
 Any other type: relay it as "Groknet event (<type>) from <Display Name>
 (@<handle>): " followed by the payload as compact JSON.

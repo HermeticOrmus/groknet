@@ -5,6 +5,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 import app.tools
 from app.api import router as api_router
+from app.auth import router as auth_router
 from app.db import init_db
 from app.mcp_server import mcp
 from app.rest import EXCEPTION_HANDLERS
@@ -34,6 +35,7 @@ app = FastAPI(
     title="Groknet", version="0.1.0", lifespan=lifespan, exception_handlers=EXCEPTION_HANDLERS
 )
 app.include_router(api_router)
+app.include_router(auth_router)
 app.include_router(rest_router)
 # Mounted last and at the root so /mcp is matched exactly; /api routes above win first.
 app.mount("/", mcp_app)
