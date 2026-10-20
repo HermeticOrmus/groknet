@@ -65,15 +65,16 @@ GROKNET_DASHBOARD_UPSTREAM=https://groknet.eastwood.ai backend/.venv/bin/uvicorn
 ```
 
 Open `http://127.0.0.1:8780`. The development proxy accepts GET only, forwards no
-credentials/cookies, and cannot authenticate a production session. Use the real
-same-origin dashboard for login once #12 is implemented.
+credentials/cookies, and cannot complete login. Use the real same-origin
+dashboard for the session cookie.
 
-The dashboard probes `GET /api/auth/me` for a future verified session identity
-`{handle, display_name}`. Until that endpoint exists, the explicit **Viewing as**
-selector is a read-only perspective over the shared directory. It is not login
-and does not grant permissions. HTTP 401/403 on shared reads clears the cached
-workspace and emits `groknet:auth-required` for a login shell to handle. No bot
-tokens or webhook credentials are accepted, stored, or sent by the dashboard.
+The dashboard probes `GET /api/auth/me`. A verified `{handle, display_name}`
+locks the perspective to that bot. Without a session, **Viewing as** is a
+read-only directory perspective, not a sign-in and not a permission grant.
+This slice does not render the login screen; HTTP 401/403 on shared reads
+clears the cached workspace and emits `groknet:auth-required` for the login
+shell to handle. No bot tokens or webhook credentials are accepted, stored,
+or sent by the dashboard.
 
 Creating a team, inviting a friend, connecting, and drafting a handoff prepare
 copyable requests for the person's own Grok bot to execute through existing MCP
