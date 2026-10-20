@@ -78,12 +78,20 @@ SEED_MESSAGES = [
     ("tomas", "alejandro", "Agreed, borrow the look, not the runtime."),
 ]
 
-# (title, status, assignee, comma-separated mentions, created_by)
+# (title, status, assignee, comma-separated mentions, created_by, assignment answer, comment)
 SEED_ISSUES = [
-    ("Write the demo script", "done", "alejandro", "tomas", "tomas"),
-    ("Projects board in the dashboard", "in_progress", "alejandro", "juan", "tomas"),
-    ("Issue webhooks in the inbox routine", "open", "juan", "", "alejandro"),
-    ("Record a backup demo video", "open", None, "alejandro,juan", "juan"),
+    ("Write the demo script", "done", "alejandro", "tomas", "tomas", "accepted", "Drafted it."),
+    (
+        "Projects board in the dashboard",
+        "in_progress",
+        "alejandro",
+        "juan",
+        "tomas",
+        "accepted",
+        None,
+    ),
+    ("Issue webhooks in the inbox routine", "open", "juan", "", "alejandro", "pending", None),
+    ("Record a backup demo video", "open", None, "alejandro,juan", "juan", None, None),
 ]
 
 
@@ -158,7 +166,7 @@ def seed(session: Session) -> dict[str, int]:
         )
     )
     issue_ids = [new_id() for _ in SEED_ISSUES]
-    for i, (issue_id, (title, status, assignee, mentions, by)) in enumerate(
+    for i, (issue_id, (title, status, assignee, mentions, by, answer, comment)) in enumerate(
         zip(issue_ids, SEED_ISSUES, strict=True)
     ):
         at = t1 + timedelta(minutes=2 + i * 3)
@@ -170,6 +178,9 @@ def seed(session: Session) -> dict[str, int]:
                 status=status,
                 assignee=assignee,
                 mentions=mentions,
+                assignment_status=answer,
+                assignment_comment=comment,
+                assigned_by=by if assignee else None,
                 created_by=by,
                 created_at=at,
                 updated_at=at,
@@ -246,6 +257,8 @@ FAKE_EVENTS: dict[str, dict[str, Any]] = {
             "title": "Write the demo script",
             "status": "open",
             "assignee": "alejandro",
+            "assignment_status": "pending",
+            "assignment_comment": None,
         },
         "project_id": "seed-project",
         "team_id": "seed-team",
@@ -259,6 +272,16 @@ FAKE_EVENTS: dict[str, dict[str, Any]] = {
         "changes": ["status"],
         "status": "in_progress",
         "assignee": "alejandro",
+        "assignment_status": "accepted",
+        "assignment_comment": None,
+    },
+    "issue_response": {
+        "issue_id": "seed-issue",
+        "project_id": "seed-project",
+        "team_id": "seed-team",
+        "by": "alejandro",
+        "assignment_status": "accepted",
+        "comment": "On it after lunch.",
     },
     "artifact_added": {
         "artifact": {"id": "seed-artifact", "title": "Demo script", "kind": "markdown"},

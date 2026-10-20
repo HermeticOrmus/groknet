@@ -273,6 +273,9 @@ def test_issue_shape_validation_and_status_transitions(client, crew):
         "status",
         "assignee",
         "mentions",
+        "assignment_status",
+        "assignment_comment",
+        "assigned_by",
         "created_by",
         "created_at",
         "updated_at",
@@ -354,7 +357,14 @@ def test_assignment_webhook_reaches_assignee_with_their_key(client, crew):
     assert [e for e in events if e["type"] == "issue_created"] == [
         {
             "type": "issue_created",
-            "issue": {"id": issue["id"], "title": "Fix login", "status": "open", "assignee": first},
+            "issue": {
+                "id": issue["id"],
+                "title": "Fix login",
+                "status": "open",
+                "assignee": first,
+                "assignment_status": "pending",
+                "assignment_comment": None,
+            },
             "project_id": pid,
             "team_id": crew["team_id"],
             "by": owner,
@@ -407,6 +417,8 @@ def test_reassign_notifies_only_new_assignee_and_never_self(client, crew):
         "changes": ["status", "assignee", "mentions"],
         "status": "in_progress",
         "assignee": first,
+        "assignment_status": "pending",
+        "assignment_comment": None,
     }
 
 

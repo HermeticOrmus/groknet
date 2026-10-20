@@ -1,8 +1,8 @@
 import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
-  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020c';
+  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020d';
 import { ISSUE_STATUSES, STATUS_LABELS, escapeHtml, resolveTheme, groupIssues, issueCountSummary,
-  statusMoves, safeUrl, renderMarkdown, visibleProjects, errorDetail,
-  issueFormModel, mentionChoices, issueSubmission } from './projects.js?v=20261020c';
+  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail,
+  issueFormModel, mentionChoices, issueSubmission, assignmentChip, applyIssueResponse } from './projects.js?v=20261020d';
 
 const $ = selector => document.querySelector(selector);
 const escape = escapeHtml;
@@ -163,6 +163,10 @@ const canWrite = team => Boolean(state.session?.handle && team?.members?.include
 const draft = (id, defaults) => ({ ...defaults, ...state.drafts[id] });
 const disabledIf = condition => condition ? 'disabled' : '';
 const STATUS_TONES = { open: '', in_progress: 'attention', done: 'success' };
+function assignmentPill(issue) {
+  const chip = assignmentChip(issue);
+  return chip ? pill(chip.label, chip.tone) : '';
+}
 function formError(key) {
   return state.formErrors[key] ? `<p class="inline-error" role="alert">${escape(state.formErrors[key])}</p>` : '';
 }
@@ -216,7 +220,7 @@ function projectsPage() {
 
 function issueCard(issue, write) {
   return `<article class="issue-card"><button type="button" class="issue-open" data-issue="${escape(issue.id)}" data-focus="issue-${escape(issue.id)}" aria-haspopup="dialog">${escape(issue.title)}</button>
-    <p class="meta">${issue.assignee ? person(issue.assignee) : 'Unassigned'}</p>
+    <div class="issue-assignee"><p class="meta">${issue.assignee ? person(issue.assignee) : 'Unassigned'}</p>${assignmentPill(issue)}</div>
     ${issue.mentions?.length ? `<div class="pill-list">${issue.mentions.map(h => `<span class="pill mention">@${escape(h)}</span>`).join('')}</div>` : ''}
     ${write ? `<div class="card-moves">${statusMoves(issue.status).map(([to, label]) => `<button type="button" class="button small" data-move="${escape(issue.id)}" data-status="${to}" ${disabledIf(state.busy)}>${label}${to === 'done' ? ' ✓' : ''}</button>`).join('')}</div>` : ''}</article>`;
 }
@@ -284,6 +288,7 @@ function issueDialogMarkup(p, team, write, issue) {
   const f = issueFormModel(issue);
   const actor = state.session?.handle || state.viewer;
   return `<div class="dialog-head"><div><span class="eyebrow">${escape(p.name)}</span><h2 id="issue-dialog-title">${!issue ? 'Create issue' : write ? 'Edit issue' : 'Issue'}</h2></div><button class="icon-button" type="button" data-action="close-issue-dialog" aria-label="Close without saving">×</button></div>
+    ${issue?.assignee ? `<div class="assignment-answer"><div class="team-heading-line">${assignmentPill(issue)}<span>${person(issue.assignee)}${issue.assigned_by ? ` · assigned by ${person(issue.assigned_by)}` : ''}</span></div>${issue.assignment_comment ? `<blockquote class="assignment-comment">${escape(issue.assignment_comment)}</blockquote>` : ''}</div>` : ''}
     ${issue ? `<p class="subtext">Opened by ${person(issue.created_by)} · updated ${escape(time(issue.updated_at))}</p>` : ''}
     <form id="issue-dialog-form"><fieldset ${disabledIf(!write)}>
     <label class="field">Title<input name="title" maxlength="200" required value="${escape(f.title)}" placeholder="What needs doing?"></label>
@@ -625,7 +630,11 @@ function openStream() {
       if (!event.created_at && event.type === 'team_message') scheduleRefresh();
     }
     if (/^(user_|friend_|team_created|team_member_added)/.test(event.type || '')) scheduleRefresh();
-    if (/^(project_created|project_updated|issue_created|issue_updated|artifact_added)$/.test(event.type || '')) {
+    if (event.type === 'issue_response' && state.project) {
+      const next = applyIssueResponse(state.project, event);
+      if (next !== state.project) { state.project = next; render(); }
+    }
+    if (/^(project_created|project_updated|issue_created|issue_updated|issue_response|artifact_added)$/.test(event.type || '')) {
       scheduleProjects(event.project_id || event.project?.id);
     }
   };

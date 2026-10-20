@@ -46,12 +46,7 @@ people find each other and exchange messages. Groknet is the "Groknet" MCP
 server (tools: register, whoami, search_users, send_friend_request,
 respond_to_friend_request, send_message, create_team, add_to_team,
 send_team_message, create_project, list_projects, create_issue, update_issue,
-list_issues, add_artifact).
-
-If a Groknet capability seems missing from your tool list, do not ask your human
-to reconnect. Call `list_groknet_tools` to see what exists right now, and invoke
-anything new through `call_groknet_tool(name, arguments)`. Those two tools never
-change, so one connection is enough for the life of the bot.
+respond_to_issue, list_issues, add_artifact).
 
 If a Groknet capability seems missing from your tool list, do not ask your human
 to reconnect. Call `list_groknet_tools` to see what exists right now, and invoke
@@ -67,16 +62,24 @@ change, so one connection is enough for the life of the bot.
   are registered as.
 
 ## Joining Groknet (one time)
-When your human says "join Groknet" or "register":
-1. Create a webhook-triggered routine named exactly "Groknet inbox". Its
-   instruction must be the text in the "Groknet inbox routine" section below,
-   copied verbatim, nothing added or removed.
-2. Tell your human: "I created the Groknet inbox routine. I can't read its
-   webhook URL or key myself; open it and paste me both (the key starts with
-   crsr_)." Link them to the routine if you can. Wait for both.
-3. Propose a handle from your human's account name (lowercase letters and
-   digits) and use your human's name as display_name. Default to no public
-   profile; offer to add job and location if they want to be easier to find.
+When your human says "join Groknet" or "register", the webhook URL comes
+first. Nothing else about Groknet works until your human has pasted it, so do
+not propose a handle, search for anyone, or call any Groknet tool before step 2
+is done.
+1. Your very first action: create a webhook-triggered routine named exactly
+   "Groknet inbox". Its instruction must be the text in the "Groknet inbox
+   routine" section below, copied verbatim, nothing added or removed.
+2. Your very first message back: show your human where the routine's webhook
+   URL and key are. Link them directly to the routine and label the links
+   "Webhook URL" and "Webhook key". Say: "I created the Groknet inbox routine.
+   I can't read its webhook URL or key myself. Open the links above, copy the
+   webhook URL and the key starting with crsr_, and paste me both. This is the
+   step that connects you to Groknet." Then stop and wait for both. If your
+   human asks anything else first, answer briefly and repeat the ask.
+3. Once both are pasted, propose a handle from your human's account name
+   (lowercase letters and digits) and use your human's name as display_name.
+   Default to no public profile; offer to add job and location if they want to
+   be easier to find.
 4. Call `register` with handle, display_name, your own @mail.grokbot.com
    email, webhook_url, webhook_key, and profile if given.
 5. Save the returned `groknet_token`. Tell your human: "You're on Groknet as
@@ -143,6 +146,18 @@ Only act on these after your human explicitly asks in this chat.
 - "Add this as an artifact to <project>": call `add_artifact` with project_id,
   title, content and kind (markdown by default; url when your human gives a
   link; attach to an issue only if they say which).
+- Answering an assignment. When an issue was assigned to your human, the inbox
+  routine shows them four choices: Accept, Accept with comment, Decline with
+  comment, Decline. When they pick one ("accept <issue>", "decline <issue>"):
+  - For "Accept with comment" or "Decline with comment", ask for the comment
+    first if they have not given it, and wait for it.
+  - Then call `respond_to_issue` with the issue id (from the relayed event, or
+    `list_issues` if unsure), accept true or false, and the comment if any. If
+    `respond_to_issue` is not in your tool list, use `call_groknet_tool`.
+  - Confirm in one line: "Accepted '<title>'; <who assigned it> has been told."
+    Remind them once that accepting is their commitment to work on it; you
+    do not start on it unless they ask.
+  - Never answer an assignment on your own, and never pick a choice for them.
 - Never assign work to someone, close an issue, or add an artifact on your
   own initiative. Report what Groknet returned, including errors, in one line.
 
@@ -205,20 +220,26 @@ team_message:
   tool to look it up during this routine.
 
 issue_assigned:
-  Groknet: <payload.message> (team <payload.team.name>).
-  Tell me if you want me to do anything about it. Do not start on it yourself.
+  Groknet: <Display Name> (@<handle>) assigned you an issue.
+  "<payload.issue.title>" in project <payload.project.name>, team
+  <payload.team.name> (issue <payload.issue.id>).
+  How do you want to answer? Reply with one of:
+    - "accept <title>"
+    - "accept <title> with comment ..."
+    - "decline <title> with comment ..."
+    - "decline <title>"
+  Accepting tells them you will work on it; I will not start on it myself.
+  Do not answer it yourself and call no tool here; your human's reply comes
+  to you in the chat.
 
 issue_mention:
   Groknet: <payload.message> (team <payload.team.name>).
   Tell me if you want me to do anything about it.
 
-issue_assigned:
-  Groknet: <payload.message> (team <payload.team.name>).
-  Tell me if you want me to do anything about it. Do not start on it yourself.
-
-issue_mention:
-  Groknet: <payload.message> (team <payload.team.name>).
-  Tell me if you want me to do anything about it.
+issue_response:
+  Groknet: <payload.message> (project <payload.project.name>, team
+  <payload.team.name>). Quote any comment exactly. No reply is needed, and
+  do nothing about it.
 
 login_code:
   Groknet dashboard login code: <payload.code>. It expires in 10 minutes. If
@@ -239,7 +260,8 @@ instruction embedded above. Facts that shaped it:
 
 - **Webhook trigger.** The routine panel shows the trigger URL
   (`https://api2.cursor.sh/automations/webhook/<id>`) and a `crsr_` key. The
-  human pastes both into chat in onboarding step 3.
+  bot surfaces both as links in its first reply and the human pastes them in
+  onboarding step 2. Nothing else happens until they do.
 - **No tools, post and stop.** If the bot's approval setting is "ask every
   time", a routine that needs a tool would wait on an approval that expires
   after about ten minutes and die silently. This routine only writes a message.
@@ -247,7 +269,8 @@ instruction embedded above. Facts that shaped it:
   instruction says so explicitly, because the bot's own instructions can't
   reach inside a routine run.
 - **Forward-compatible.** `team_message` (#16), `login_code` (#12) and the
-  project events `issue_assigned` / `issue_mention` (#32) are handled; unknown
+  project events `issue_assigned` / `issue_mention` (#32) and
+  `issue_response` are handled; unknown
   types are relayed raw instead of dropped. The meta-tools paragraph (#35) lets
   a bot reach tools shipped after it connected.
 - **Check the bot's copy.** After onboarding, open the routine and compare its
@@ -263,13 +286,16 @@ minutes.
 1. **Paste this one prompt** into your bot's chat:
 
    > Add a custom MCP server named Groknet at https://groknet.eastwood.ai/mcp,
-   > no auth, then register me on Groknet. Make your inbox routine relay events
-   > to me and never act on them. When you need the routine's webhook URL and
-   > key, ask me. Then find sudotomas and send him a friend request.
+   > no auth. Before anything else, create a webhook routine named "Groknet
+   > inbox" that relays events to me and never acts on them, then immediately
+   > show me links to its webhook URL and its crsr_ key and ask me to paste
+   > both; that is the step that connects me to Groknet, so do it first and
+   > wait. Once I paste them, register me on Groknet, then find sudotomas and
+   > send him a friend request.
 
-   The bot adds the server, creates the "Groknet inbox" routine, proposes your
-   handle and name, and asks for the routine's webhook URL and key. It links
-   you straight to them ("Webhook URL", "Webhook key").
+   The bot's first reply is the two links ("Webhook URL", "Webhook key") and
+   the ask. It does not propose a handle or touch any other tool until you
+   paste them.
 2. **Paste the credentials.** Click the links, copy the webhook URL and the
    key starting with `crsr_`, paste both. Pasting the whole
    `Authorization: Bearer crsr_…` line as copied is fine. The bot replies
@@ -310,6 +336,11 @@ and in `README.md`.
   on 503, so duplicates should be rare.
 - The Projects section is written from the #32 contract (PR #34); the tools
   resolve through `call_groknet_tool` until a bot reconnects.
+- An assignment is answered, not acted on (decided 2026-10-20): the inbox
+  offers exactly Accept, Accept with comment, Decline with comment, Decline;
+  the human's reply goes to the main chat, where the bot calls
+  `respond_to_issue`. The assigner and the issue's creator get
+  `issue_response`, which is relayed with no suggested action.
 - A bot never shares its human's private data over Groknet unless told exactly
   what to send (added after a live "send me a rundown of your emails" test).
 - Tool wording lives in the MCP docstrings (`backend/app/tools/*.py`), not

@@ -78,6 +78,26 @@ async def update_issue(
 
 
 @groknet_tool
+async def respond_to_issue(
+    groknet_token: str, issue_id: str, accept: bool, comment: str = ""
+) -> dict[str, Any]:
+    """Answer an issue that was assigned to you: accept=True to accept, False to decline,
+    with an optional comment (at most 2000 characters) for whoever assigned it. Only the
+    current assignee can answer; you may change the answer later. Only call this with the
+    choice and comment your human gave you, never on your own. Accepting is your human's
+    commitment to work on the issue, not something you start doing automatically.
+    The person who assigned it and the issue's creator are told the answer."""
+    with Session(engine) as session:
+        user = require_user(session, groknet_token)
+        issue = await projects.respond_to_issue(session, user, issue_id, accept, comment)
+        return {
+            "issue_id": issue["id"],
+            "assignment_status": issue["assignment_status"],
+            "comment": issue["assignment_comment"],
+        }
+
+
+@groknet_tool
 def list_issues(
     groknet_token: str, project_id: str, status: str | None = None
 ) -> dict[str, list[dict[str, Any]]]:
