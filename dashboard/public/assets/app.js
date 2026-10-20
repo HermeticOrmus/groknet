@@ -1,7 +1,7 @@
 import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
-  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020b';
+  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020c';
 import { ISSUE_STATUSES, STATUS_LABELS, escapeHtml, resolveTheme, groupIssues, issueCountSummary,
-  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail } from './projects.js?v=20261020b';
+  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail } from './projects.js?v=20261020c';
 
 const $ = selector => document.querySelector(selector);
 const escape = escapeHtml;
@@ -39,7 +39,7 @@ function owner(handle) { return state.users.find(u => u.handle === handle); }
 function ownerName(handle) { return owner(handle)?.display_name || handle; }
 function botName(handle) { return `${ownerName(handle)}’s bot`; }
 function avatar(handle, size = '') {
-  const tone = [...String(handle || '')].reduce((n, c) => n + c.charCodeAt(0), 0) % 3;
+  const tone = [...String(handle || '')].reduce((n, c) => n + c.charCodeAt(0), 0) % 6;
   return `<span class="bot-avatar ${size}" data-tone="${tone}" aria-hidden="true"></span>`;
 }
 function pill(text, tone = '') { return `<span class="pill ${tone}">${escape(text)}</span>`; }

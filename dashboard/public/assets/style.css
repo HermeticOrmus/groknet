@@ -53,3 +53,20 @@ a.artifact-title{color:var(--green)}
 .form-grid{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:12px}
 .mention-set legend{font-size:11px;color:var(--sub);margin-bottom:4px}
 @media(max-width:580px){.topbar{flex-wrap:wrap}.form-grid{grid-template-columns:minmax(0,1fr)}.artifact-head .meta{margin-left:0;width:100%}.row-right{max-width:140px}}
+
+/* Grok theme (docs/ui/grok-theme-proposal.md, "do first"): palette on the existing tokens, Inter, pills, six avatar tones. */
+:root{--bg:light-dark(#f9f8f7,#131211);--surface:light-dark(#ffffff,#201f1d);--rail:light-dark(#f2f1ef,#1a1917);--ink:light-dark(#050505,#fcfcfc);--sub:light-dark(#636363,#9e9e9e);--line:light-dark(#e6e5e3,rgba(252,252,252,.1));--soft:light-dark(rgba(10,10,10,.055),rgba(252,252,252,.06));--green:light-dark(#1f8a4c,#5fd08a);--green-bg:light-dark(rgba(31,138,76,.12),rgba(95,208,138,.13));--amber:light-dark(#b26a00,#f0b45a);--amber-bg:light-dark(rgba(178,106,0,.14),rgba(240,180,90,.14));--red:light-dark(#d92d20,#ff7b72);--red-bg:light-dark(rgba(217,45,32,.10),rgba(255,123,114,.13));font-family:Inter,'universalSans',system-ui,-apple-system,sans-serif;font-size:15px}
+body{font-family:inherit}
+h1{letter-spacing:-.5px;font-weight:550}h2{font-weight:550}h3{font-weight:550}strong{font-weight:550}
+.button,.icon-button,.pill,.receipt-button,.auth-button,.perspective-bar select,.field input,.field select,input.search-input{border-radius:999px}
+.field textarea,.panel,.board-column,.issue-card,.project-link,.inline-form,.notice,.team-symbol,.markdown,.artifact-text{border-radius:14px}
+dialog{border-radius:24px}
+.button{font-size:14px;padding:8px 16px}.button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}.button.primary:hover{filter:none;opacity:.86}
+.pill{font-size:12px;padding:4px 10px}.meta,.field-note,.nav-count,.tab-count,.message-head time,.receipt-button{font-size:12px}
+.subtext{font-size:13px}.sidebar nav a{font-size:13px;border-radius:999px}.tabs button{font-size:13px}.row h3{font-size:15px}.message-body{font-size:15px}
+.brand span{color:var(--ink)}.stream-state[data-state=stale] .status-dot{background:#ff3b30}
+:focus-visible{outline-color:light-dark(#3857c7,#7c95f0)}.check-row input{accent-color:var(--ink)}
+.bot-avatar{border-radius:50%;background:#5b8def}.bot-avatar::before,.bot-avatar::after{background:rgba(255,255,255,.92)}
+.bot-avatar[data-tone="1"]{background:#f06a4f}.bot-avatar[data-tone="2"]{background:#2fb98a}.bot-avatar[data-tone="3"]{background:#f2a93b}.bot-avatar[data-tone="4"]{background:#a56cf5}.bot-avatar[data-tone="5"]{background:#e2558e}
+.message-body mark{background:light-dark(#f2feff,rgba(0,147,163,.16));color:light-dark(#0093a3,#5fd4e0)}.pill.mention{background:light-dark(#f2feff,rgba(0,147,163,.16));color:light-dark(#0093a3,#5fd4e0)}
+@media(prefers-reduced-motion:no-preference){.button,.row,.sidebar nav a,.icon-button{transition:background-color .1s ease,color .1s ease,opacity .1s ease}}
