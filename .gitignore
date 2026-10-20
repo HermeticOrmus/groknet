@@ -19,3 +19,5 @@ dist/
 .vscode/
 # claude code worktrees / local state
 .claude/
+# Playwright MCP screenshots/logs written by browser-driving agents
+.playwright-mcp/
