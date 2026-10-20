@@ -204,7 +204,7 @@ function projectsPage() {
   const team = state.projectTeam ? teamById(state.projectTeam) : null;
   const scope = state.viewer ? state.projectScope : 'all';
   const list = visibleProjects(state.projects, { teamId: state.projectTeam, teams: state.teams, viewer: state.viewer, scope });
-  const body = state.projectsError ? `<div class="notice" style="margin-top:14px">${escape(state.projectsError)} <button class="button" type="button" data-action="retry-projects">Retry</button></div>` :
+  const body = state.projectsError ? `<div class="notice" style="margin-top:14px">${escape(state.projectsError)} ${state.session ? '' : '<button class="button" type="button" data-action="sign-in">Sign in</button>'}<button class="button" type="button" data-action="retry-projects">Retry</button></div>` :
     !state.projectsLoaded ? '<div class="loading-state"><span class="loading-dot"></span>Loading projects…</div>' :
     list.map(projectRow).join('') || empty(team ? 'No projects for this team yet' : 'No projects yet', 'Create one for a team you belong to. Issues and artifacts live inside it.');
   return heading(team ? `${team.name} projects` : 'Projects', team ? 'Every project this team owns.' : 'Shared outcomes, issues, and artifacts for your teams.',
@@ -401,6 +401,7 @@ async function loadProjects() {
     state.projects = rows; state.projectsError = '';
   } catch (error) {
     state.projectsError = error.status === 404 ? 'The projects API is not available on this backend yet.' :
+      error.status === 401 ? 'Sign in to see projects.' :
       `Projects could not be loaded. ${error.message}`;
   }
   state.projectsLoaded = true;
@@ -419,6 +420,7 @@ async function loadProject(id) {
   } catch (error) {
     if (error.name === 'AbortError' || state.projectId !== id) return;
     state.projectError = error.status === 404 ? 'This project does not exist, or the projects API is not available yet.' :
+      error.status === 401 ? 'Sign in to see this project.' :
       `Project could not be refreshed. ${error.message}`;
   } finally {
     if (projectAbort === controller) render();
