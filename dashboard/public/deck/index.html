@@ -10,8 +10,8 @@
 <style>
   html, body { margin: 0; height: 100%; background: #0B0B0C; color: #FCFCFC; overflow: hidden; }
   body { font-family: 'DM Sans', Arial, sans-serif; }
-  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  #frame { position: relative; width: 1920px; height: 1080px; transform-origin: center center; }
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  #frame { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; margin-left: -960px; margin-top: -540px; transform-origin: center center; }
   .slide { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; box-sizing: border-box; }
   .slide:not(.active) { display: none !important; }
   .slide h1, .slide h2, .slide h3, .slide p, .slide ul, .slide ol { margin: 0; }
