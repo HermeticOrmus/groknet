@@ -28,6 +28,9 @@ fieldset{border:0;padding:0;margin:0;min-width:0}
 .issue-open{border:0;padding:0;text-align:left;font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
 .issue-open:hover{text-decoration:underline;text-underline-offset:3px}
 .issue-card .meta{line-height:1.5}
+.issue-assignee{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;min-width:0}
+.assignment-answer{margin-top:12px}.assignment-answer .team-heading-line{margin:0}
+.assignment-comment{margin:8px 0 0;padding:8px 10px;border-left:2px solid var(--line);font-size:12px;line-height:1.7;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
 .pill.mention{background:var(--green-bg);color:var(--green)}
 .card-moves{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
 .button.small{min-height:28px;padding:3px 8px;font-size:11px}

@@ -1,7 +1,8 @@
 import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
-  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020c';
+  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020d';
 import { ISSUE_STATUSES, STATUS_LABELS, escapeHtml, resolveTheme, groupIssues, issueCountSummary,
-  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail } from './projects.js?v=20261020c';
+  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail,
+  assignmentChip, applyIssueResponse } from './projects.js?v=20261020d';
 
 const $ = selector => document.querySelector(selector);
 const escape = escapeHtml;
@@ -162,6 +163,10 @@ const canWrite = team => Boolean(state.session?.handle && team?.members?.include
 const draft = (id, defaults) => ({ ...defaults, ...state.drafts[id] });
 const disabledIf = condition => condition ? 'disabled' : '';
 const STATUS_TONES = { open: '', in_progress: 'attention', done: 'success' };
+function assignmentPill(issue) {
+  const chip = assignmentChip(issue);
+  return chip ? pill(chip.label, chip.tone) : '';
+}
 function formError(key) {
   return state.formErrors[key] ? `<p class="inline-error" role="alert">${escape(state.formErrors[key])}</p>` : '';
 }
@@ -216,7 +221,7 @@ function projectsPage() {
 function issueCard(issue, write) {
   const selected = state.issueId === issue.id;
   return `<article class="issue-card ${selected ? 'selected' : ''}"><button type="button" class="issue-open" data-issue="${escape(issue.id)}" aria-pressed="${selected}">${escape(issue.title)}</button>
-    <p class="meta">${issue.assignee ? person(issue.assignee) : 'Unassigned'}</p>
+    <div class="issue-assignee"><p class="meta">${issue.assignee ? person(issue.assignee) : 'Unassigned'}</p>${assignmentPill(issue)}</div>
     ${issue.mentions?.length ? `<div class="pill-list">${issue.mentions.map(h => `<span class="pill mention">@${escape(h)}</span>`).join('')}</div>` : ''}
     ${write ? `<div class="card-moves">${statusMoves(issue.status).map(([to, label]) => `<button type="button" class="button small" data-move="${escape(issue.id)}" data-status="${to}" ${disabledIf(state.busy)}>${label}${to === 'done' ? ' ✓' : ''}</button>`).join('')}</div>` : ''}</article>`;
 }
@@ -252,6 +257,7 @@ function issueInspector(p, team, write, issue) {
   const busy = state.busy === 'issue-form';
   return `<aside class="panel"><div class="dialog-head" style="margin-bottom:4px"><div><span class="eyebrow">Issue</span><h2>${escape(issue.title)}</h2></div><button class="icon-button" type="button" data-action="close-issue" aria-label="Close issue">×</button></div>
     <p class="subtext">Opened by ${person(issue.created_by)} · updated ${escape(time(issue.updated_at))}</p>
+    ${issue.assignee ? `<div class="assignment-answer"><div class="team-heading-line">${assignmentPill(issue)}<span>${person(issue.assignee)}${issue.assigned_by ? ` · assigned by ${person(issue.assigned_by)}` : ''}</span></div>${issue.assignment_comment ? `<blockquote class="assignment-comment">${escape(issue.assignment_comment)}</blockquote>` : ''}</div>` : ''}
     <form id="issue-form" data-draft><fieldset ${disabledIf(!write || busy)}>
     <label class="field">Title<input name="title" data-focus="if-title" maxlength="200" required value="${escape(d.title)}"></label>
     <label class="field">Description<textarea name="description" data-focus="if-desc" rows="4">${escape(d.description)}</textarea></label>
@@ -573,7 +579,11 @@ function openStream() {
       if (!event.created_at && event.type === 'team_message') scheduleRefresh();
     }
     if (/^(user_|friend_|team_created|team_member_added)/.test(event.type || '')) scheduleRefresh();
-    if (/^(project_created|project_updated|issue_created|issue_updated|artifact_added)$/.test(event.type || '')) {
+    if (event.type === 'issue_response' && state.project) {
+      const next = applyIssueResponse(state.project, event);
+      if (next !== state.project) { state.project = next; render(); }
+    }
+    if (/^(project_created|project_updated|issue_created|issue_updated|issue_response|artifact_added)$/.test(event.type || '')) {
       scheduleProjects(event.project_id || event.project?.id);
     }
   };

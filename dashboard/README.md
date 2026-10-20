@@ -109,7 +109,10 @@ rendered with a minimal subset (headings, bold, links to http(s) only, lists,
 code); `url` artifacts are links with `rel="noopener noreferrer"`. Forms are
 disabled while in flight and show the API `detail` on 400/403. The list and the
 open project refetch on `project_created`, `project_updated`, `issue_created`,
-`issue_updated` and `artifact_added`. If the backend has no projects API yet the
+`issue_updated`, `issue_response` and `artifact_added`. An assigned issue's card
+shows the assignee's answer as a pill (Awaiting answer / Accepted / Declined);
+the inspector adds who assigned it and the comment, escaped. `issue_response`
+also patches the open project in place so the pill changes immediately. If the backend has no projects API yet the
 page says so instead of failing the workroom.
 
 `assets/state.js` and `assets/projects.js` contain the testable rules (receipts,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTheme, groupIssues, issueCountSummary, statusMoves, issuePatch, safeUrl,
-  renderMarkdown, visibleProjects, errorDetail } from '../public/assets/projects.js';
+  renderMarkdown, visibleProjects, errorDetail, assignmentChip, applyIssueResponse } from '../public/assets/projects.js';
 
 test('theme: stored toggle choice wins, dark otherwise', () => {
   assert.equal(resolveTheme('light'), 'light');
@@ -89,4 +89,32 @@ test('error detail prefers the API text and summarises validation lists', () => 
   assert.equal(errorDetail({ detail: 'Only members can write.' }, 403), 'Only members can write.');
   assert.equal(errorDetail({ detail: [{ msg: 'field required' }] }, 422), 'field required');
   assert.equal(errorDetail(null, 401), 'Sign in to continue.');
+});
+
+test('assignment chip: none without an assignee, otherwise the answer with its tone', () => {
+  assert.equal(assignmentChip({ assignee: null, assignment_status: null }), null);
+  assert.equal(assignmentChip({ assignee: '', assignment_status: 'accepted' }), null);
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'pending' }),
+    { label: 'Awaiting answer', tone: 'attention' });
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'accepted' }),
+    { label: 'Accepted', tone: 'success' });
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'declined' }),
+    { label: 'Declined', tone: 'danger' });
+  // Older rows and unknown values read as still waiting.
+  assert.deepEqual(assignmentChip({ assignee: 'juan' }), { label: 'Awaiting answer', tone: 'attention' });
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'x' }), { label: 'Awaiting answer', tone: 'attention' });
+});
+
+test('issue_response patches the matching issue and leaves the rest alone', () => {
+  const project = { id: 'p1', issues: [{ id: 'a', assignee: 'juan', assignment_status: 'pending', assignment_comment: null }, { id: 'b' }] };
+  const event = { type: 'issue_response', issue_id: 'a', project_id: 'p1', assignment_status: 'declined', comment: 'No time' };
+  const next = applyIssueResponse(project, event);
+  assert.notEqual(next, project);
+  assert.deepEqual(next.issues[0], { id: 'a', assignee: 'juan', assignment_status: 'declined', assignment_comment: 'No time' });
+  assert.equal(next.issues[1], project.issues[1]);
+  assert.equal(project.issues[0].assignment_status, 'pending');
+  assert.equal(applyIssueResponse(project, { ...event, project_id: 'other' }), project);
+  assert.equal(applyIssueResponse(project, { ...event, issue_id: 'zzz' }), project);
+  assert.equal(applyIssueResponse(null, event), null);
+  assert.equal(applyIssueResponse(project, { ...event, comment: undefined }).issues[0].assignment_comment, null);
 });
