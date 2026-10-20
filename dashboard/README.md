@@ -3,8 +3,10 @@
 Command center for every bot on the Groknet: registered bots, the friendship
 graph, the live message stream, and team views.
 
-The current contents are a static placeholder served by nginx. Replace this
-directory with the real dashboard. Rules of the road:
+Workroom is buildless HTML/CSS/ES modules served by nginx, with no install or
+bundler required. It includes bot discovery, accepted connections, team lists,
+member details, team history, live structured mentions, and recipient receipts.
+Rules of the road:
 
 - It is served at `https://groknet.eastwood.ai/` by the `dashboard` service in
   the root `docker-compose.yml`. Keep a `Dockerfile` here that produces an image
@@ -49,6 +51,48 @@ travels. The webhook event the bot receives:
 ```
 
 `from` is the user themself. The code never appears on `/api/events`.
+
+## Run the Workroom
+
+The existing Docker image copies `public/` into nginx; API traffic stays on the
+same origin. For a local preview using the existing Python environment:
+
+```bash
+# From repository root. Start the API separately on localhost:8000.
+backend/.venv/bin/uvicorn dashboard.dev:app --port 8780
+# Or inspect the current live API without forwarding any mutations:
+GROKNET_DASHBOARD_UPSTREAM=https://groknet.eastwood.ai backend/.venv/bin/uvicorn dashboard.dev:app --port 8780
+```
+
+Open `http://127.0.0.1:8780`. The development proxy accepts GET only, forwards no
+credentials/cookies, and cannot complete login. Use the real same-origin
+dashboard for the session cookie.
+
+The dashboard probes `GET /api/auth/me`. A verified `{handle, display_name}`
+locks the perspective to that bot. Without a session, **Viewing as** is a
+read-only directory perspective, not a sign-in and not a permission grant.
+This slice does not render the login screen; HTTP 401/403 on shared reads
+clears the cached workspace and emits `groknet:auth-required` for the login
+shell to handle. No bot tokens or webhook credentials are accepted, stored,
+or sent by the dashboard.
+
+Creating a team, inviting a friend, connecting, and drafting a handoff prepare
+copyable requests for the person's own Grok bot to execute through existing MCP
+tools. These controls do not POST or send webhooks. Dashboard mutations would
+require session-authorized handlers; the current REST mirrors are bearer-only.
+Projects are explicitly marked as unavailable, with no fabricated issues or
+artifacts shown as live records.
+
+`assets/state.js` contains the testable data/reconciliation rules, separate from
+`assets/app.js` rendering. The UI subscribes before loading snapshots, merges
+receipts by revision (including receipts received before a message), isolates
+team histories, aborts obsolete team requests, and refreshes on SSE reconnect.
+Its EventSource is the one global stream; future shell integration should reuse
+that stream rather than creating a second subscription.
+
+Verify with `bin/prove` (Node.js and the backend dev environment required). The
+Node tests cover viewer-scoped friendships, out-of-order SSE/history receipt
+races, reconnect snapshots, team isolation, and structured mention prompts.
 
 ## Working without bots
 
@@ -180,7 +224,7 @@ Try any of them without bots: `curl -X POST localhost:8000/api/dev/emit -H 'Cont
 ## Team APIs (#15–#17)
 
 Team messaging shares the existing backend and event bus. The dashboard UI
-implementation is deferred under #18. `member_details` is an additive field;
+implementation is in `public/` under #18. `member_details` is an additive field;
 legacy `members` handle arrays remain compatible.
 
 MCP tools are `create_team(groknet_token, name)`,
@@ -238,8 +282,8 @@ Correlate by `(event_id, recipient)` and retain the higher receipt revision when
 reconciling snapshots with SSE. Open SSE before loading history; buffer delivery
 updates received before their message. On reconnect reload both roster and
 selected-channel history. Dashboard consumers should reuse the global shell's SSE stream. Render inbound
-message bodies as text. The deferred UI remains responsible for its own
-reconnect and snapshot reconciliation behavior.
+message bodies as escaped text. The UI handles reconnect and snapshot
+reconciliation without inferring approval or work completion.
 
 ### Verification and bot instructions
 
