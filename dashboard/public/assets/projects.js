@@ -59,6 +59,29 @@ export function issuePatch(original, draft) {
   return patch;
 }
 
+const ASSIGNMENT_CHIPS = {
+  pending: { label: 'Awaiting answer', tone: 'attention' },
+  accepted: { label: 'Accepted', tone: 'success' },
+  declined: { label: 'Declined', tone: 'danger' },
+};
+
+/** The assignee's answer as a pill, or null when nobody is assigned. Unknown reads as waiting. */
+export function assignmentChip(issue) {
+  if (!issue?.assignee) return null;
+  return { ...(ASSIGNMENT_CHIPS[issue.assignment_status] || ASSIGNMENT_CHIPS.pending) };
+}
+
+/** Apply an `issue_response` SSE event to the open project detail without mutating it. */
+export function applyIssueResponse(project, event) {
+  if (!project || event?.project_id !== project.id) return project;
+  if (!project.issues?.some(i => i.id === event.issue_id)) return project;
+  return {
+    ...project,
+    issues: project.issues.map(i => i.id !== event.issue_id ? i :
+      { ...i, assignment_status: event.assignment_status, assignment_comment: event.comment ?? null }),
+  };
+}
+
 export function safeUrl(value) {
   const url = String(value ?? '').trim();
   return /^https?:\/\/[^\s]+$/i.test(url) ? url : '';

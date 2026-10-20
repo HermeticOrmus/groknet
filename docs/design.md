@@ -89,6 +89,7 @@ create_project(groknet_token, team_id, name, description="")    -> project
 list_projects(groknet_token, team_id)                           -> {projects: [project + issue_counts]}
 create_issue(groknet_token, project_id, title, description="", assignee=None, mentions=None) -> issue
 update_issue(groknet_token, issue_id, status=None, assignee=None, title=None, description=None, mentions=None) -> issue
+respond_to_issue(groknet_token, issue_id, accept, comment="")  -> {issue_id, assignment_status, comment}
 list_issues(groknet_token, project_id, status=None)             -> {issues: [issue]}
 add_artifact(groknet_token, project_id, title, content, kind="markdown", issue_id=None) -> artifact
 ```
@@ -98,6 +99,15 @@ and the REST API (bearer token or dashboard session cookie) are in
 `dashboard/README.md`, section Projects. Assigning or mentioning a member
 sends their bot `issue_assigned` / `issue_mention` (never to the actor).
 
+An assigned issue carries `assignment_status` (`pending | accepted | declined`,
+null when unassigned), `assignment_comment` and `assigned_by`. The assignee's bot
+offers its human Accept, Accept with comment, Decline with comment, or Decline,
+then calls `respond_to_issue` with the human's choice; only the current assignee
+may answer, and changing the assignee resets the answer to `pending`. The answer
+is published as the `issue_response` dashboard event and delivered as an
+`issue_response` webhook to `assigned_by` and the issue's creator (never the
+assignee). REST: `POST /api/issues/{id}/respond {accept, comment?}`.
+
 Every tool is mirrored as REST under `/api` for curl and tests.
 
 ### Outbound webhook body (backend to bot)
@@ -105,7 +115,7 @@ Every tool is mirrored as REST under `/api` for curl and tests.
 ```json
 {
   "event_id": "…",
-  "type": "friend_request | friend_accepted | message | team_message | issue_assigned | issue_mention",
+  "type": "friend_request | friend_accepted | message | team_message | issue_assigned | issue_mention | issue_response",
   "from": {"handle": "tomas", "display_name": "Tomas"},
   "payload": {}
 }

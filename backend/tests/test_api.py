@@ -78,6 +78,8 @@ def test_seed_loads_the_demo_dataset_and_is_idempotent(client, dev_mode) -> None
     assert project["issue_counts"] == {"open": 2, "in_progress": 1, "done": 1}
     detail = client.get(f"/api/projects/{project['id']}", headers=seed_auth).json()
     assert any(i["assignee"] and i["mentions"] for i in detail["issues"])
+    answers = sorted(str(i["assignment_status"]) for i in detail["issues"])
+    assert answers == ["None", "accepted", "accepted", "pending"]
     assert sorted(a["kind"] for a in detail["artifacts"]) == ["markdown", "url"]
 
 
@@ -120,6 +122,10 @@ def test_emit_publishes_a_fake_event_on_the_bus(client, dev_mode) -> None:
         ("issue_created", {"issue", "project_id", "team_id", "by"}),
         ("issue_updated", {"issue_id", "project_id", "team_id", "by", "changes", "status"}),
         ("artifact_added", {"artifact", "project_id", "issue_id", "team_id", "by"}),
+        (
+            "issue_response",
+            {"issue_id", "project_id", "team_id", "by", "assignment_status", "comment"},
+        ),
     ],
 )
 def test_emit_has_templates_for_project_events(client, dev_mode, event_type, keys) -> None:
