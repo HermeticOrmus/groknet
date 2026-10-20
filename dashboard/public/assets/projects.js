@@ -59,6 +59,40 @@ export function issuePatch(original, draft) {
   return patch;
 }
 
+/** Form values for the issue dialog: blanks for a new issue, the issue's own values to edit one. */
+export function issueFormModel(issue = null) {
+  return {
+    title: issue?.title || '',
+    description: issue?.description || '',
+    status: ISSUE_STATUSES.includes(issue?.status) ? issue.status : 'open',
+    assignee: issue?.assignee || '',
+    mentions: [...new Set(issue?.mentions || [])],
+  };
+}
+
+/** Handles offered as mention checkboxes: team members except the actor, plus anyone already mentioned. */
+export function mentionChoices(members = [], actor = '', current = []) {
+  return [...new Set([...members.filter(h => h !== actor), ...current])];
+}
+
+/**
+ * What the issue dialog sends. Create: a POST body with only the filled fields, plus a
+ * status to PATCH afterwards (POST /issues takes no status; new issues start open).
+ * Edit: the issuePatch of changed fields, empty when nothing changed. A blank title is an error.
+ */
+export function issueSubmission(form, original = null) {
+  if (!String(form?.title ?? '').trim()) return { error: 'Add a title.' };
+  if (original) return { patch: issuePatch(original, form) };
+  const body = { title: String(form.title).trim() };
+  const description = String(form.description ?? '').trim();
+  if (description) body.description = description;
+  if (form.assignee) body.assignee = form.assignee;
+  const mentions = [...new Set(form.mentions || [])];
+  if (mentions.length) body.mentions = mentions;
+  const status = ISSUE_STATUSES.includes(form.status) && form.status !== 'open' ? form.status : '';
+  return { body, status };
+}
+
 const ASSIGNMENT_CHIPS = {
   pending: { label: 'Awaiting answer', tone: 'attention' },
   accepted: { label: 'Accepted', tone: 'success' },

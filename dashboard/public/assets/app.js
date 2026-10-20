@@ -2,7 +2,7 @@ import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
   teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020d';
 import { ISSUE_STATUSES, STATUS_LABELS, escapeHtml, resolveTheme, groupIssues, issueCountSummary,
   statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail,
-  assignmentChip, applyIssueResponse } from './projects.js?v=20261020d';
+  issueFormModel, mentionChoices, issueSubmission, assignmentChip, applyIssueResponse } from './projects.js?v=20261020d';
 
 const $ = selector => document.querySelector(selector);
 const escape = escapeHtml;
@@ -13,9 +13,9 @@ const state = {
   teamTab: 'mine', query: '', teamName: '', teamMembers: new Set(),
   handoff: '', mentions: new Set(), historyLoading: false, historyError: '',
   error: '', authRequired: false, stream: 'connecting', updated: null,
-  // Projects (#33): list, selected project/issue/artifact, form drafts survive re-renders.
+  // Projects (#33): list, selected project/artifact, form drafts survive re-renders.
   projects: [], projectsLoaded: false, projectsError: '', projectScope: 'mine', projectTeam: '',
-  projectId: '', project: null, projectError: '', issueId: '', artifactId: '', artifactForm: false,
+  projectId: '', project: null, projectError: '', artifactId: '', artifactForm: false,
   drafts: {}, formErrors: {}, busy: '',
 };
 try { state.viewer = localStorage.getItem('groknet:perspective') || ''; } catch { /* optional */ }
@@ -178,9 +178,9 @@ function memberOptions(team, selected) {
   return `<option value="">Unassigned</option>` + (team?.members || []).map(h =>
     `<option value="${escape(h)}" ${h === selected ? 'selected' : ''}>${person(h)}</option>`).join('');
 }
-function mentionChecks(team, checked) {
+function mentionChecks(handles, checked) {
   const set = new Set(checked || []);
-  return `<fieldset class="mention-set"><legend>Mention</legend><div class="compose-mentions">${(team?.members || []).map(h =>
+  return `<fieldset class="mention-set"><legend>Mention</legend><div class="compose-mentions">${handles.map(h =>
     `<label class="check-row"><input type="checkbox" name="mention" value="${escape(h)}" ${set.has(h) ? 'checked' : ''}>@${escape(h)}</label>`).join('')}</div></fieldset>`;
 }
 
@@ -219,8 +219,7 @@ function projectsPage() {
 }
 
 function issueCard(issue, write) {
-  const selected = state.issueId === issue.id;
-  return `<article class="issue-card ${selected ? 'selected' : ''}"><button type="button" class="issue-open" data-issue="${escape(issue.id)}" aria-pressed="${selected}">${escape(issue.title)}</button>
+  return `<article class="issue-card"><button type="button" class="issue-open" data-issue="${escape(issue.id)}" data-focus="issue-${escape(issue.id)}" aria-haspopup="dialog">${escape(issue.title)}</button>
     <div class="issue-assignee"><p class="meta">${issue.assignee ? person(issue.assignee) : 'Unassigned'}</p>${assignmentPill(issue)}</div>
     ${issue.mentions?.length ? `<div class="pill-list">${issue.mentions.map(h => `<span class="pill mention">@${escape(h)}</span>`).join('')}</div>` : ''}
     ${write ? `<div class="card-moves">${statusMoves(issue.status).map(([to, label]) => `<button type="button" class="button small" data-move="${escape(issue.id)}" data-status="${to}" ${disabledIf(state.busy)}>${label}${to === 'done' ? ' ✓' : ''}</button>`).join('')}</div>` : ''}</article>`;
@@ -252,35 +251,16 @@ function artifactsSection(p, write) {
     }).join('')}${form}</section>`;
 }
 
-function issueInspector(p, team, write, issue) {
-  const d = draft('issue-form', { title: issue.title, description: issue.description || '', status: issue.status, assignee: issue.assignee || '', mention: issue.mentions || [] });
-  const busy = state.busy === 'issue-form';
-  return `<aside class="panel"><div class="dialog-head" style="margin-bottom:4px"><div><span class="eyebrow">Issue</span><h2>${escape(issue.title)}</h2></div><button class="icon-button" type="button" data-action="close-issue" aria-label="Close issue">×</button></div>
-    <p class="subtext">Opened by ${person(issue.created_by)} · updated ${escape(time(issue.updated_at))}</p>
-    ${issue.assignee ? `<div class="assignment-answer"><div class="team-heading-line">${assignmentPill(issue)}<span>${person(issue.assignee)}${issue.assigned_by ? ` · assigned by ${person(issue.assigned_by)}` : ''}</span></div>${issue.assignment_comment ? `<blockquote class="assignment-comment">${escape(issue.assignment_comment)}</blockquote>` : ''}</div>` : ''}
-    <form id="issue-form" data-draft><fieldset ${disabledIf(!write || busy)}>
-    <label class="field">Title<input name="title" data-focus="if-title" maxlength="200" required value="${escape(d.title)}"></label>
-    <label class="field">Description<textarea name="description" data-focus="if-desc" rows="4">${escape(d.description)}</textarea></label>
-    <label class="field">Status<select name="status" data-focus="if-status">${ISSUE_STATUSES.map(s => `<option value="${s}" ${d.status === s ? 'selected' : ''}>${STATUS_LABELS[s]}</option>`).join('')}</select></label>
-    <label class="field">Assignee<select name="assignee" data-focus="if-assignee">${memberOptions(team, d.assignee)}</select></label>
-    ${mentionChecks(team, d.mention)}
-    ${write ? `<button class="button primary full" type="submit" style="margin-top:14px">${busy ? 'Saving…' : 'Save changes'}</button>` : ''}${formError('issue-form')}</fieldset></form>
-    ${!write ? (state.session ? `<p class="field-note">Only members of ${escape(team?.name || 'this team')} can edit issues.</p>` : signInPrompt('Sign in as a team member to edit this issue.')) : ''}</aside>`;
+function projectInspector(team, write) {
+  const intro = write ? '<p class="subtext">Create issues with the button above and click a card to edit it. Assigned bots and mentioned members are notified through their own bot.</p>' :
+    state.session ? `<p class="subtext">Only members of ${escape(team?.name || 'this team')} can add or change issues. You can still read everything here; click a card for its detail.</p>` :
+    signInPrompt('Sign in as a member of this team to add issues, move them, and share artifacts.');
+  return `<aside class="panel"><h2>Work on this project</h2>${intro}<hr class="rule"><h3>Members</h3>${(team?.members || []).map(h => `<p class="meta">${person(h)}</p>`).join('')}</aside>`;
 }
 
-function projectInspector(p, team, write) {
-  const issue = p.issues.find(i => i.id === state.issueId);
-  if (issue) return issueInspector(p, team, write, issue);
-  if (!write) return `<aside class="panel"><h2>Work on this project</h2>${state.session ? `<p class="subtext">Only members of ${escape(team?.name || 'this team')} can add or change issues. You can still read everything here.</p>` : signInPrompt('Sign in as a member of this team to add issues, move them, and share artifacts.')}<hr class="rule"><h3>Members</h3>${(team?.members || []).map(h => `<p class="meta">${person(h)}</p>`).join('')}</aside>`;
-  const d = draft('new-issue', { title: '', description: '', assignee: '', mention: [] });
-  const busy = state.busy === 'new-issue';
-  return `<aside class="panel"><h2>New issue</h2><p class="subtext">Assigned bots and mentioned members are notified through their own bot.</p>
-    <form id="new-issue" data-draft><fieldset ${disabledIf(busy)}>
-    <label class="field">Title<input name="title" data-focus="ni-title" maxlength="200" required value="${escape(d.title)}" placeholder="What needs doing?"></label>
-    <label class="field">Description<textarea name="description" data-focus="ni-desc" rows="3">${escape(d.description)}</textarea></label>
-    <label class="field">Assignee<select name="assignee" data-focus="ni-assignee">${memberOptions(team, d.assignee)}</select></label>
-    ${mentionChecks(team, d.mention)}
-    <button class="button primary full" type="submit" style="margin-top:14px">${busy ? 'Creating…' : 'Create issue'}</button>${formError('new-issue')}</fieldset></form></aside>`;
+function projectContext(p = state.project) {
+  const team = p.team || teamById(p.team_id) || { id: p.team_id, name: 'Team', members: [] };
+  return { team, write: canWrite(team) };
 }
 
 function projectPage() {
@@ -289,16 +269,87 @@ function projectPage() {
     if (state.projectError) return heading('Project unavailable', state.projectError) + '<a class="button" href="#projects">← All projects</a>';
     return '<div class="loading-state"><span class="loading-dot"></span>Loading project…</div>';
   }
-  const team = p.team || teamById(p.team_id) || { id: p.team_id, name: 'Team', members: [] };
-  const write = canWrite(team);
+  const { team, write } = projectContext(p);
   const archived = p.status === 'archived';
   const columns = groupIssues(p.issues);
-  return heading(p.name, p.description || 'No description yet.', `<div class="button-row">${write ? `<button class="button" type="button" data-action="toggle-archive" ${disabledIf(state.busy)}>${archived ? 'Restore project' : 'Archive project'}</button>` : ''}<a class="button" href="#projects">← All projects</a></div>`) +
+  return heading(p.name, p.description || 'No description yet.', `<div class="button-row">${write ? `<button class="button primary" type="button" data-action="create-issue" data-focus="create-issue" aria-haspopup="dialog">Create issue</button><button class="button" type="button" data-action="toggle-archive" ${disabledIf(state.busy)}>${archived ? 'Restore project' : 'Archive project'}</button>` : ''}<a class="button" href="#projects">← All projects</a></div>`) +
     `<div class="team-heading-line">${pill(archived ? 'Archived' : 'Active', archived ? '' : 'success')}<a class="subtle-link" href="#teams/${enc(team.id)}">${escape(team.name)}</a><span>Created by ${escape(ownerName(p.created_by))} · ${escape(time(p.created_at))}</span>${!state.session ? '<span>Read only · sign in to edit</span>' : !write ? '<span>Read only · not a team member</span>' : ''}</div>
     ${formError('archive')}${formError('move')}${state.projectError ? `<div class="notice">${escape(state.projectError)}</div>` : ''}
     <div class="workroom-layout"><section><div class="board">${ISSUE_STATUSES.map(s => `<section class="board-column" aria-labelledby="col-${s}"><div class="column-head"><h2 id="col-${s}">${STATUS_LABELS[s]}</h2><span class="tab-count">${columns[s].length}</span></div>
       ${columns[s].map(i => issueCard(i, write)).join('') || `<p class="column-empty">No ${STATUS_LABELS[s].toLowerCase()} issues</p>`}</section>`).join('')}</div>
-    ${artifactsSection(p, write)}</section>${projectInspector(p, team, write)}</div>`;
+    ${artifactsSection(p, write)}</section>${projectInspector(team, write)}</div>`;
+}
+
+// Issue dialog (create and edit). It lives outside #main, so board re-renders and live
+// events never touch what the person is typing. Closing (×, Cancel, Escape) discards edits.
+let issueDialog = { id: '', project: '', opener: '' };
+
+function issueDialogMarkup(p, team, write, issue) {
+  const f = issueFormModel(issue);
+  const actor = state.session?.handle || state.viewer;
+  return `<div class="dialog-head"><div><span class="eyebrow">${escape(p.name)}</span><h2 id="issue-dialog-title">${!issue ? 'Create issue' : write ? 'Edit issue' : 'Issue'}</h2></div><button class="icon-button" type="button" data-action="close-issue-dialog" aria-label="Close without saving">×</button></div>
+    ${issue?.assignee ? `<div class="assignment-answer"><div class="team-heading-line">${assignmentPill(issue)}<span>${person(issue.assignee)}${issue.assigned_by ? ` · assigned by ${person(issue.assigned_by)}` : ''}</span></div>${issue.assignment_comment ? `<blockquote class="assignment-comment">${escape(issue.assignment_comment)}</blockquote>` : ''}</div>` : ''}
+    ${issue ? `<p class="subtext">Opened by ${person(issue.created_by)} · updated ${escape(time(issue.updated_at))}</p>` : ''}
+    <form id="issue-dialog-form"><fieldset ${disabledIf(!write)}>
+    <label class="field">Title<input name="title" maxlength="200" required value="${escape(f.title)}" placeholder="What needs doing?"></label>
+    <label class="field">Description<textarea name="description" rows="4">${escape(f.description)}</textarea></label>
+    <div class="issue-dialog-grid"><label class="field">Status<select name="status">${ISSUE_STATUSES.map(s => `<option value="${s}" ${f.status === s ? 'selected' : ''}>${STATUS_LABELS[s]}</option>`).join('')}</select></label>
+    <label class="field">Assignee<select name="assignee">${memberOptions(team, f.assignee)}</select></label></div>
+    ${mentionChecks(mentionChoices(team.members || [], actor, f.mentions), f.mentions)}
+    <p class="inline-error" id="issue-dialog-error" role="alert" hidden></p>
+    ${write ? `<div class="dialog-footer"><span class="subtext">Assigned and mentioned bots are notified through their own bot.</span><div class="button-row"><button class="button quiet" type="button" data-action="close-issue-dialog">Cancel</button><button class="button primary" type="submit">${issue ? 'Save' : 'Create issue'}</button></div></div>` : ''}
+    </fieldset></form>
+    ${!write ? (state.session ? `<p class="field-note">Only members of ${escape(team.name)} can edit issues.</p>` : signInPrompt('Sign in as a team member to edit this issue.')) : ''}`;
+}
+
+function openIssueDialog(issueId = '') {
+  const p = state.project;
+  const issue = issueId ? p?.issues.find(i => i.id === issueId) : null;
+  if (!p || (issueId && !issue)) return;
+  const { team, write } = projectContext(p);
+  const dialog = $('#issue-dialog');
+  // data-focus keys let render() keep focus on the opener when a live refetch redraws the board.
+  issueDialog = { id: issueId, project: p.id, opener: `[data-focus="${CSS.escape(issueId ? `issue-${issueId}` : 'create-issue')}"]` };
+  dialog.innerHTML = issueDialogMarkup(p, team, write, issue);
+  if (!dialog.open) dialog.showModal();
+  (dialog.querySelector('input[name="title"]:enabled') || dialog.querySelector('[data-action="close-issue-dialog"]')).focus();
+}
+
+function issueDialogError(text) {
+  const el = $('#issue-dialog-error');
+  if (el) { el.textContent = text; el.hidden = !text; }
+}
+
+async function submitIssueDialog(form) {
+  const p = state.project;
+  if (!p || p.id !== issueDialog.project) return;
+  const original = issueDialog.id ? p.issues.find(i => i.id === issueDialog.id) : null;
+  const data = new FormData(form);
+  const result = issueSubmission({ title: data.get('title'), description: data.get('description'), status: data.get('status'),
+    assignee: data.get('assignee'), mentions: data.getAll('mention') }, original);
+  if (result.error) { issueDialogError(result.error); form.elements.title.focus(); return; }
+  if (result.patch && !Object.keys(result.patch).length) { $('#issue-dialog').close(); return; }
+  const fieldset = form.querySelector('fieldset');
+  const submit = form.querySelector('[type=submit]');
+  const label = submit.textContent;
+  fieldset.disabled = true; submit.textContent = original ? 'Saving…' : 'Creating…'; issueDialogError('');
+  let created = null;
+  try {
+    if (original) putIssue(await send('PATCH', `/api/issues/${enc(original.id)}`, result.patch));
+    else {
+      created = await send('POST', `/api/projects/${enc(p.id)}/issues`, result.body);
+      putIssue(created);
+      if (result.status) putIssue(await send('PATCH', `/api/issues/${enc(created.id)}`, { status: result.status }));
+    }
+    render();
+    $('#announcement').textContent = original ? 'Issue saved.' : 'Issue created.';
+    $('#issue-dialog').close();
+  } catch (error) {
+    if (created) { render(); openIssueDialog(created.id); issueDialogError(`The issue was created, but its status could not be set. ${error.message}`); return; }
+    issueDialogError(error.status === 401 ? 'Sign in to save changes.' : error.message);
+  } finally {
+    if (form.isConnected) { fieldset.disabled = false; submit.textContent = label; }
+  }
 }
 
 function render() {
@@ -602,9 +653,10 @@ function route() {
     state.messageId = ''; state.handoff = ''; state.mentions.clear();
   }
   if (previousProject !== state.projectId) {
-    projectAbort?.abort(); state.project = null; state.projectError = ''; state.issueId = ''; state.artifactId = '';
+    projectAbort?.abort(); state.project = null; state.projectError = ''; state.artifactId = '';
     state.artifactForm = false;
-    for (const key of ['issue-form', 'new-issue', 'new-artifact', 'archive', 'move']) { delete state.drafts[key]; delete state.formErrors[key]; }
+    if ($('#issue-dialog').open) $('#issue-dialog').close();
+    for (const key of ['new-artifact', 'archive', 'move']) { delete state.drafts[key]; delete state.formErrors[key]; }
   }
   render();
   if (state.ready && state.teamId && previous !== state.teamId) void loadHistory(state.teamId);
@@ -637,13 +689,9 @@ document.addEventListener('click', async event => {
     updateIdentity(); render(); void refresh();
   }
   if (projectScope) { state.projectScope = projectScope; render(); }
-  if (issue) {
-    state.issueId = state.issueId === issue ? '' : issue;
-    delete state.drafts['issue-form']; delete state.formErrors['issue-form']; render();
-    // One-column layouts put the inspector below the board; bring it into view.
-    if (state.issueId && window.matchMedia?.('(max-width: 850px)').matches) document.querySelector('#issue-form')?.closest('aside')?.scrollIntoView({ block: 'start' });
-  }
-  if (action === 'close-issue') { state.issueId = ''; delete state.drafts['issue-form']; render(); }
+  if (issue) openIssueDialog(issue);
+  if (action === 'create-issue') openIssueDialog();
+  if (action === 'close-issue-dialog') $('#issue-dialog').close();
   if (artifact) { state.artifactId = state.artifactId === artifact ? '' : artifact; render(); }
   if (action === 'show-artifact-form') { state.artifactForm = true; render(); document.querySelector('[data-focus="na-title"]')?.focus(); }
   if (action === 'hide-artifact-form') { state.artifactForm = false; delete state.drafts['new-artifact']; delete state.formErrors['new-artifact']; render(); }
@@ -723,19 +771,7 @@ document.addEventListener('submit', event => {
     });
   }
   const projectId = state.project?.id;
-  if (form.id === 'new-issue' && projectId) {
-    const d = captureDraft(form);
-    const body = { title: d.title.trim(), description: d.description.trim(), mentions: d.mention || [] };
-    if (d.assignee) body.assignee = d.assignee;
-    void runForm('new-issue', async () => putIssue(await send('POST', `/api/projects/${enc(projectId)}/issues`, body)));
-  }
-  if (form.id === 'issue-form' && projectId) {
-    const issue = state.project.issues.find(i => i.id === state.issueId);
-    const d = captureDraft(form);
-    const patch = issue && issuePatch(issue, { title: d.title, description: d.description, status: d.status, assignee: d.assignee, mentions: d.mention || [] });
-    if (!patch || !Object.keys(patch).length) { state.formErrors['issue-form'] = 'Nothing changed.'; render(); return; }
-    void runForm('issue-form', async () => putIssue(await send('PATCH', `/api/issues/${enc(issue.id)}`, patch)));
-  }
+  if (form.id === 'issue-dialog-form') void submitIssueDialog(form);
   if (form.id === 'new-artifact' && projectId) {
     const d = captureDraft(form);
     void runForm('new-artifact', async () => {
@@ -762,6 +798,12 @@ document.addEventListener('submit', event => {
   }
 });
 
+$('#issue-dialog').addEventListener('close', () => {
+  const opener = issueDialog.opener;
+  issueDialog = { id: '', project: '', opener: '' };
+  $('#issue-dialog').replaceChildren();
+  if (opener) document.querySelector(opener)?.focus();
+});
 document.addEventListener('groknet:auth-required', () => openSignIn('Your dashboard session is required or has expired.'));
 window.addEventListener('hashchange', route);
 window.addEventListener('online', () => void refresh());
