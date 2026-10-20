@@ -1,7 +1,7 @@
 """REST surface.
 
 /api/health              liveness
-/api/users, /friendships, /messages, /teams
+/api/users, /friendships, /messages, /teams, /teams/{id}/messages
                          dashboard read API: live DB rows, never credentials
 /api/events              SSE stream of everything the backend sends to bots
 /api/dev/*               seed data and fake events, only with GROKNET_DEV=1
@@ -82,6 +82,21 @@ def list_teams(session: SessionDep) -> list[dict]:
         }
         for t in teams
     ]
+
+
+@router.get("/teams/{team_id}/messages")
+def list_team_messages(
+    team_id: str, session: SessionDep, limit: Annotated[int, Query(ge=1, le=1000)] = 200
+) -> list[Message]:
+    if session.get(Team, team_id) is None:
+        raise HTTPException(status_code=404, detail=f"No team with id {team_id!r}.")
+    stmt = (
+        select(Message)
+        .where(Message.team_id == team_id)
+        .order_by(Message.created_at.desc())
+        .limit(limit)
+    )
+    return list(session.exec(stmt).all())
 
 
 @router.get("/events")

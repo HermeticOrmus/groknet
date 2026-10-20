@@ -13,7 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlmodel import Session
 
-from app import friendships, messaging
+from app import friendships, messaging, teams
 from app.db import get_session
 from app.errors import AuthError, GroknetError
 from app.models import User
@@ -57,6 +57,15 @@ class RespondBody(BaseModel):
 class MessageBody(BaseModel):
     handle: str
     body: str
+
+
+class TeamBody(BaseModel):
+    name: str
+
+
+class TeamMessageBody(BaseModel):
+    body: str
+    mentions: list[str] | None = None
 
 
 @router.post("/register", status_code=201)
@@ -104,6 +113,29 @@ async def send_message(
 ) -> dict[str, str | bool]:
     message = await messaging.send_message(session, user, body.handle, body.body)
     return {"event_id": message.event_id, "delivered": message.delivered}
+
+
+@router.post("/teams")
+def create_team(body: TeamBody, user: UserDep, session: SessionDep) -> dict[str, Any]:
+    team = teams.create_team(session, user, body.name)
+    return {"team_id": team.id, "name": team.name, "members": [user.handle]}
+
+
+@router.post("/teams/{team_id}/members")
+def add_to_team(
+    team_id: str, body: HandleBody, user: UserDep, session: SessionDep
+) -> dict[str, Any]:
+    return {"team_id": team_id, "members": teams.add_to_team(session, user, team_id, body.handle)}
+
+
+@router.post("/teams/{team_id}/messages")
+async def send_team_message(
+    team_id: str, body: TeamMessageBody, user: UserDep, session: SessionDep
+) -> dict[str, Any]:
+    message, delivered_to, failed = await teams.send_team_message(
+        session, user, team_id, body.body, body.mentions
+    )
+    return {"event_id": message.event_id, "delivered_to": delivered_to, "failed": failed}
 
 
 def groknet_error_handler(_: Request, exc: Exception) -> JSONResponse:
