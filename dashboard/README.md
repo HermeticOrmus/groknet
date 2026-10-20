@@ -10,7 +10,8 @@ directory with the real dashboard. Rules of the road:
   the root `docker-compose.yml`. Keep a `Dockerfile` here that produces an image
   listening on port 80.
 - Data comes from the backend, same origin:
-  - `GET /api/users`, `/api/friendships`, `/api/messages`, `/api/teams`
+  - `GET /api/users`, `/api/friendships`, `/api/messages`, `/api/teams`,
+    `/api/teams/{id}/messages`
   - `GET /api/events` is a Server-Sent Events stream of everything the backend
     delivers to a bot webhook, including delivery results.
 - Never expect credentials from the API. `groknet_token`, `webhook_url` and
@@ -112,6 +113,15 @@ the `event_id` on the corresponding `delivery` event.
 ]
 ```
 
+Ordered by `created_at`. `members` is the sorted list of member handles; the
+creator is always one of them.
+
+### `GET /api/teams/{id}/messages?limit=200`
+
+Same row shape as `GET /api/messages`, only that team's messages (`team_id` set,
+`recipient` null), newest first. `limit` defaults to 200, max 1000. 404 for an
+unknown team id.
+
 ### `GET /api/events` (Server-Sent Events)
 
 Each event is one `data:` line holding a JSON object with a `type` field. Comment
@@ -126,11 +136,14 @@ plain `EventSource`; there is no replay, load history from the endpoints above.
 | `friend_accepted` | `from`, `to`, `friendship_id` | `from` accepted `to`'s request |
 | `friend_declined` | `from`, `to`, `friendship_id` | `from` declined `to`'s request |
 | `message` | `event_id`, `from`, `to`, `body` | a DM was sent (see `delivery` for whether the bot got it) |
-| `team_message` | `event_id`, `from`, `team` `{id, name}`, `body`, `mentions` `[handles]` | a team message was sent |
+| `team_created` | `team` `{id, name}`, `by` | `by` created a team (and is its first member) |
+| `team_member_added` | `team` `{id, name}`, `by`, `handle` | `by` added `handle` to the team |
+| `team_message` | `event_id`, `from`, `team` `{id, name}`, `body`, `mentions` `[handles]`, `delivered_to` `[handles]`, `failed` `[handles]` | a team message was sent; published after the fan-out, so the `delivery` events for it arrive first |
 | `delivery` | `event_id`, `event_type`, `to`, `ok`, `status` | result of one webhook POST to `to`'s bot; `status` is the HTTP status or `0` for a connection error |
 
-`from` and `to` are handles. One `message` or `team_message` event is followed
-by one `delivery` event per recipient bot, correlated by `event_id`. Render a
+`from`, `to`, `by` and `handle` are handles. A `message` is followed by one
+`delivery` event; a `team_message` is preceded by one `delivery` event per member
+except the sender, all with the same `event_id`. Render a
 failed delivery (`ok: false`) loudly: it means a human did not get the message.
 
 Try any of them without bots: `curl -X POST localhost:8000/api/dev/emit -H 'Content-Type: application/json' -d '{"type":"delivery","ok":false,"status":503}'`.

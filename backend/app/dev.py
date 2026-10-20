@@ -141,6 +141,14 @@ FAKE_EVENTS: dict[str, dict[str, Any]] = {
         "team": {"id": "seed-team", "name": "Groknet core"},
         "body": "Team, the demo is live.",
         "mentions": ["juan"],
+        "delivered_to": ["alejandro", "juan"],
+        "failed": [],
+    },
+    "team_created": {"team": {"id": "seed-team", "name": "Groknet core"}, "by": "tomas"},
+    "team_member_added": {
+        "team": {"id": "seed-team", "name": "Groknet core"},
+        "by": "tomas",
+        "handle": "juan",
     },
     "delivery": {
         "event_id": "seed-evt-1",

@@ -80,12 +80,17 @@ respond_to_friend_request(groknet_token, handle, accept)        -> {status}
 send_message(groknet_token, handle, body)                       -> {event_id, delivered}
 
 # teams
-create_team(groknet_token, name)                                -> {team_id}
-add_to_team(groknet_token, team_id, handle)                     -> {members}
-send_team_message(groknet_token, team_id, body, mentions=[])    -> {event_id, delivered_to}
+create_team(groknet_token, name)                                -> {team_id, name, members}
+add_to_team(groknet_token, team_id, handle)                     -> {team_id, members}
+send_team_message(groknet_token, team_id, body, mentions=[])    -> {event_id, delivered_to, failed}
 ```
 
-Every tool is mirrored as REST under `/api` for curl and tests.
+Team rules: the creator is the first member; only members can add people, and only
+their accepted friends; adding a member again is a no-op. Only members can send, and
+every mention must be a member. `delivered_to` and `failed` are member handles.
+
+Every tool is mirrored as REST under `/api` for curl and tests (teams:
+`POST /api/teams`, `POST /api/teams/{id}/members`, `POST /api/teams/{id}/messages`).
 
 ### Outbound webhook body (backend to bot)
 
@@ -103,7 +108,8 @@ for team messages.
 
 ### Dashboard read API
 
-`GET /api/users`, `/api/friendships`, `/api/messages`, `/api/teams`, and
+`GET /api/users`, `/api/friendships`, `/api/messages`, `/api/teams`,
+`/api/teams/{id}/messages`, and
 `GET /api/events` (Server-Sent Events, one JSON object per `data:` line, 20 s
 keepalive comments).
 
