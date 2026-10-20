@@ -1,7 +1,7 @@
 import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
-  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js';
+  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020b';
 import { ISSUE_STATUSES, STATUS_LABELS, escapeHtml, resolveTheme, groupIssues, issueCountSummary,
-  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail } from './projects.js';
+  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail } from './projects.js?v=20261020b';
 
 const $ = selector => document.querySelector(selector);
 const escape = escapeHtml;
