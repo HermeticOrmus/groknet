@@ -48,7 +48,7 @@ class Mcp:
     def list_tools(self) -> list[str]:
         return [t["name"] for t in self._rpc("tools/list", {})["result"]["tools"]]
 
-    def call(self, name: str, **arguments) -> dict:
+    def call(self, name: str, /, **arguments) -> dict:
         """Returns the tool's structured result, or raises ToolError with the tool's message."""
         result = self._rpc("tools/call", {"name": name, "arguments": arguments})["result"]
         if result.get("isError"):
