@@ -19,3 +19,6 @@ dist/
 .vscode/
 # claude code worktrees / local state
 .claude/
+
+# playwright mcp screenshots and snapshots
+.playwright-mcp/

@@ -64,27 +64,57 @@ backend/.venv/bin/uvicorn dashboard.dev:app --port 8780
 GROKNET_DASHBOARD_UPSTREAM=https://groknet.eastwood.ai backend/.venv/bin/uvicorn dashboard.dev:app --port 8780
 ```
 
-Open `http://127.0.0.1:8780`. The development proxy accepts GET only, forwards no
-credentials/cookies, and cannot complete login. Use the real same-origin
-dashboard for the session cookie.
+Open `http://127.0.0.1:8780`. The development proxy forwards GET, POST and PATCH
+under `/api` with the browser's cookie and body and passes `Set-Cookie` back, so
+sign-in and dashboard writes work through it. Point it at a local backend, not
+production, when you intend to write.
+
+`GROKNET_DASHBOARD_MOCK=1` additionally serves in-memory fixtures for the
+projects API (`dashboard/dev_mock.py`: two projects, six issues, three
+artifacts, #32 shapes) for backends that do not have it yet. Mock writes still
+require a real upstream session and publish their SSE event through the
+upstream's dev-only `/api/dev/emit`. Neither file is in the production image.
+
+To sign in locally without a real bot, run `scripts/fake_bot.py tomas 9101`,
+point the seeded `tomas` user's `webhook_url` at
+`http://127.0.0.1:9101/automations/webhook/tomas` with `webhook_key`
+`crsr_tomas`, and read the code from the fake bot's output.
 
 The dashboard probes `GET /api/auth/me`. A verified `{handle, display_name}`
-locks the perspective to that bot. Without a session, **Viewing as** is a
-read-only directory perspective, not a sign-in and not a permission grant.
-This slice does not render the login screen; HTTP 401/403 on shared reads
-clears the cached workspace and emits `groknet:auth-required` for the login
-shell to handle. No bot tokens or webhook credentials are accepted, stored,
-or sent by the dashboard.
+replaces the **Viewing as** selector with **Signed in as**. Without a session,
+**Viewing as** is a read-only directory perspective, not a sign-in and not a
+permission grant. The header's **Sign in** opens the sign-in panel (email, then
+the 6-digit code the person's own bot relays); the backend's `detail` text is
+shown on errors. A 401 on any write, or the `groknet:auth-required` event (401/403
+on shared reads), opens the same panel. No bot tokens or webhook credentials are
+accepted, stored, or sent by the dashboard.
+
+Theme: dark by default; the header toggle stores `groknet:theme` in
+`localStorage`. Colors are the `light-dark()` tokens on `:root`, switched by
+`color-scheme` on `:root[data-theme]`.
 
 Creating a team, inviting a friend, connecting, and drafting a handoff prepare
 copyable requests for the person's own Grok bot to execute through existing MCP
-tools. These controls do not POST or send webhooks. Dashboard mutations would
-require session-authorized handlers; the current REST mirrors are bearer-only.
-Projects are explicitly marked as unavailable, with no fabricated issues or
-artifacts shown as live records.
+tools. These controls do not POST or send webhooks.
 
-`assets/state.js` contains the testable data/reconciliation rules, separate from
-`assets/app.js` rendering. The UI subscribes before loading snapshots, merges
+Projects (#33) are the exception: signed-in team members write directly with
+the session cookie (`credentials: 'same-origin'`) against the #32 REST contract.
+`#projects` lists projects (My teams / All, or one team via
+`#projects/team/<team_id>`, linked from each team page) with issue counts and a
+**New project** form. `#projects/<id>` shows the project header with an archive
+toggle, open / in progress / done columns with status buttons on each card, an
+inspector to edit an issue (title, description, status, assignee, mentions) or
+create one, and an artifacts panel. Markdown artifacts are escaped first and then
+rendered with a minimal subset (headings, bold, links to http(s) only, lists,
+code); `url` artifacts are links with `rel="noopener noreferrer"`. Forms are
+disabled while in flight and show the API `detail` on 400/403. The list and the
+open project refetch on `project_created`, `project_updated`, `issue_created`,
+`issue_updated` and `artifact_added`. If the backend has no projects API yet the
+page says so instead of failing the workroom.
+
+`assets/state.js` and `assets/projects.js` contain the testable rules (receipts,
+issue grouping and counts, issue PATCH diffing, the markdown renderer, theme
+resolution), separate from `assets/app.js` rendering. The UI subscribes before loading snapshots, merges
 receipts by revision (including receipts received before a message), isolates
 team histories, aborts obsolete team requests, and refreshes on SSE reconnect.
 Its EventSource is the one global stream; future shell integration should reuse
