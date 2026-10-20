@@ -1,0 +1,46 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#grok-content-area"
+  - generic [ref=e9]:
+    - banner:
+      - navigation "Top navigation":
+        - link "Home page" [ref=e13] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e17]:
+          - link "Imagine" [ref=e19] [cursor=pointer]:
+            - /url: /imagine
+          - generic [ref=e25]:
+            - button "Settings" [ref=e27] [cursor=pointer]
+            - link "Sign in" [ref=e32] [cursor=pointer]:
+              - /url: /sign-in?return_to=%2F
+            - link "Sign up" [ref=e33] [cursor=pointer]:
+              - /url: /sign-up?return_to=%2F
+    - main [ref=e34]:
+      - generic [ref=e35]:
+        - heading [level=1] [ref=e37]:
+          - text: What should we
+          - generic [ref=e38]: explore?
+        - generic [ref=e46]:
+          - generic [ref=e49]:
+            - textbox "Ask Grok anything" [ref=e50]
+            - generic [aria-hidden]:
+              - generic: Type / to use slash commands
+          - generic [ref=e52]:
+            - button "Attach" [ref=e54] [cursor=pointer]
+            - generic [ref=e59]:
+              - 'button "Model: Fast" [ref=e61] [cursor=pointer]':
+                - generic [ref=e62]: Fast
+              - button "Submit" [disabled] [ref=e68] [cursor=pointer]:
+                - generic [ref=e74]: Type a message to send
+    - contentinfo:
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - text: By messaging Grok, you agree to our
+          - link "Terms" [ref=e77] [cursor=pointer]:
+            - /url: https://x.ai/legal/terms-of-service
+          - text: and
+          - link "Privacy Policy" [ref=e78] [cursor=pointer]:
+            - /url: https://x.ai/legal/privacy-policy
+          - text: .
+        - button "Your privacy choices" [ref=e79] [cursor=pointer]
+        - status [ref=e80]
