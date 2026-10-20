@@ -353,6 +353,7 @@ so they also sort as strings. Lists are oldest first.
 | GET `/api/projects/{id}/issues?status=` | | `[issue]` |
 | POST `/api/projects/{id}/issues` | `{title, description?, assignee?, mentions?}` | 201 issue |
 | PATCH `/api/issues/{id}` | `{title?, description?, status?, assignee?, mentions?}` | issue |
+| POST `/api/issues/{id}/respond` | `{accept, comment?}` | issue (assignee only, else 403) |
 | GET `/api/projects/{id}/artifacts` | | `[artifact]` |
 | POST `/api/projects/{id}/artifacts` | `{title, kind, content, issue_id?}` | 201 artifact |
 
@@ -366,8 +367,9 @@ Shapes:
 
 // issue
 {"id":"i1","project_id":"p1","title":"Write the demo script","description":"",
- "status":"open","assignee":"alejandro","mentions":["tomas"],"created_by":"tomas",
- "created_at":"...","updated_at":"..."}
+ "status":"open","assignee":"alejandro","mentions":["tomas"],
+ "assignment_status":"accepted","assignment_comment":"Drafted it.","assigned_by":"tomas",
+ "created_by":"tomas","created_at":"...","updated_at":"..."}
 
 // artifact
 {"id":"a1","project_id":"p1","issue_id":null,"title":"Repository","kind":"url",
@@ -388,14 +390,24 @@ must start with `http://` or `https://`; an `issue_id` must belong to the same
 project. Render artifact content as escaped text or sanitized markdown, and only
 link `url` artifacts.
 
+Assignment answers: `assignment_status` is `pending|accepted|declined` while the
+issue has an assignee and `null` when it has none; `assignment_comment` is the
+assignee's optional note (at most 2000 chars, `null` when empty) and
+`assigned_by` is who set the current assignee. Assigning starts at `pending`;
+any change of assignee (including clearing it) resets all three. Only the
+current assignee may `POST /api/issues/{id}/respond`; they may change their
+answer later, and `updated_at` moves each time.
+
 ### Project SSE events
 
 - `project_created`: `{type, project: {id, name}, team_id, by}`
 - `project_updated`: `{type, project_id, team_id, by, changes: ["name", "status", ...]}`
-- `issue_created`: `{type, issue: {id, title, status, assignee}, project_id, team_id, by}`
-- `issue_updated`: `{type, issue_id, project_id, team_id, by, changes: [fields], status, assignee}`
+- `issue_created`: `{type, issue: {id, title, status, assignee, assignment_status, assignment_comment}, project_id, team_id, by}`
+- `issue_updated`: `{type, issue_id, project_id, team_id, by, changes: [fields], status, assignee, assignment_status, assignment_comment}`
+- `issue_response`: `{type, issue_id, project_id, team_id, by, assignment_status, comment}`, the
+  assignee (`by`) accepted or declined; `comment` is null when none was given
 - `artifact_added`: `{type, artifact: {id, title, kind}, project_id, issue_id, team_id, by}`
-- `delivery` with `event_type` `issue_assigned` or `issue_mention`: the shared
+- `delivery` with `event_type` `issue_assigned`, `issue_mention` or `issue_response`: the shared
   delivery event (`event_id`, `to`, `ok`, `status`).
 
 `changes` lists only fields whose value actually changed (it can be empty).
@@ -413,3 +425,9 @@ assignment. Payload: `{issue: {id, title, status}, project: {id, name},
 team: {id, name}, message: "Tomas assigned you 'Write the demo script' in Hackathon demo"}`
 (mentions read "Tomas mentioned you in '...' in ..."). Delivery failures never
 fail the request.
+
+When the assignee answers, whoever assigned the issue (`assigned_by`) and its
+creator get `issue_response`, once each and never the assignee themself.
+Payload: `{issue: {id, title, status, assignment_status, comment}, project: {id, name},
+team: {id, name}, message: "Alejandro accepted 'Write the demo script': Drafted it."}`
+(no `: comment` suffix when there is none; "declined" for a decline).
