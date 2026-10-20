@@ -18,6 +18,7 @@ backend/.venv/bin/ruff check dashboard/dev.py dashboard/dev_mock.py
 node --check dashboard/public/assets/app.js
 node --check dashboard/public/assets/state.js
 node --check dashboard/public/assets/projects.js
+node --check dashboard/public/assets/markdown.js
 git diff --check
 lint=PASS
 build=FAIL
