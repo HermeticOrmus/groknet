@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Python backend checks; no provider calls or production data.
+# Backend and dashboard checks; no provider calls or production data.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 lint=NOT_RUN
@@ -14,6 +14,9 @@ if [[ ! -x backend/.venv/bin/python || ! -x backend/.venv/bin/ruff ]]; then
 fi
 lint=FAIL
 (cd backend && .venv/bin/ruff check .)
+backend/.venv/bin/ruff check dashboard/dev.py
+node --check dashboard/public/assets/app.js
+node --check dashboard/public/assets/state.js
 git diff --check
 lint=PASS
 build=FAIL
@@ -21,4 +24,5 @@ backend/.venv/bin/python -m compileall -q backend/app
 build=PASS
 smoke=FAIL
 (cd backend && .venv/bin/pytest -q)
+node --test dashboard/tests/*.test.js
 smoke=PASS

@@ -1,0 +1,9 @@
+{
+  "name": "groknet-workroom",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check public/assets/app.js && node --check public/assets/state.js"
+  }
+}
