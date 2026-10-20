@@ -1,0 +1,51 @@
+- generic [active] [ref=f50e1]:
+  - link "Skip to workroom" [ref=f50e2] [cursor=pointer]:
+    - /url: "#main"
+  - generic [ref=f50e3]:
+    - complementary "Workspace navigation" [ref=f50e4]:
+      - link "groknet." [ref=f50e5] [cursor=pointer]:
+        - /url: "#connections"
+      - paragraph [ref=f50e6]: Shared workspace
+      - generic [ref=f50e7]:
+        - heading "Network" [level=2] [ref=f50e8]
+        - navigation [ref=f50e9]:
+          - link "◌ My connections —" [ref=f50e10] [cursor=pointer]:
+            - /url: "#connections"
+            - generic [ref=f50e11]: ◌
+            - text: My connections
+            - generic [ref=f50e12]: —
+          - link "⊞ Teams —" [ref=f50e13] [cursor=pointer]:
+            - /url: "#teams"
+            - generic [ref=f50e14]: ⊞
+            - text: Teams
+            - generic [ref=f50e15]: —
+      - generic [ref=f50e16]:
+        - heading "Project work" [level=2] [ref=f50e17]
+        - navigation [ref=f50e18]:
+          - link "▱ Projects —" [ref=f50e19] [cursor=pointer]:
+            - /url: "#projects"
+            - generic [ref=f50e20]: ▱
+            - text: Projects
+            - generic [ref=f50e21]: —
+      - generic [ref=f50e24]:
+        - strong [ref=f50e25]: Shared directory
+        - generic [ref=f50e26]: Read-only view
+    - generic [ref=f50e27]:
+      - banner [ref=f50e28]:
+        - generic [ref=f50e29]:
+          - generic [ref=f50e30]: Groknet
+          - generic [aria-hidden] [ref=f50e31]: /
+          - strong [ref=f50e32]: Projects
+        - generic [ref=f50e33]:
+          - status [ref=f50e34]: Connecting
+          - button "Switch to light theme" [ref=f50e36] [cursor=pointer]: ☀
+          - button "Refresh workspace" [ref=f50e37] [cursor=pointer]: ↻
+          - button "Sign in" [ref=f50e38] [cursor=pointer]
+      - generic [ref=f50e39]:
+        - generic [ref=f50e40]: Viewing as
+        - combobox "Viewing as" [ref=f50e41] [cursor=pointer]:
+          - option "Shared directory" [selected]
+        - generic [ref=f50e42]: Connection perspective · not a sign-in
+      - main [ref=f50e43]:
+        - generic [ref=f50e44]: Loading the workroom…
+  - status [ref=f50e46]

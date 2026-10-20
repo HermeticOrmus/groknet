@@ -1,0 +1,51 @@
+- generic [ref=f24e1]:
+  - link "Skip to main content" [ref=f24e2] [cursor=pointer]:
+    - /url: "#grok-content-area"
+  - generic [ref=f24e9]:
+    - banner:
+      - navigation "Top navigation":
+        - link "Home page" [ref=f24e13] [cursor=pointer]:
+          - /url: /
+        - generic [ref=f24e17]:
+          - link "Imagine" [ref=f24e19] [cursor=pointer]:
+            - /url: /imagine
+          - generic [ref=f24e36]:
+            - button "Settings" [ref=f24e38] [cursor=pointer]
+            - link "Sign in" [ref=f24e43] [cursor=pointer]:
+              - /url: /sign-in?return_to=%2F
+            - link "Sign up" [ref=f24e44] [cursor=pointer]:
+              - /url: /sign-up?return_to=%2F
+    - main [ref=f24e45]:
+      - generic [ref=f24e46]:
+        - heading [level=1] [ref=f24e48]:
+          - text: What should we
+          - generic [ref=f24e49]: explore?
+        - generic [ref=f24e57]:
+          - generic [ref=f24e60]:
+            - combobox "Ask Grok anything" [active] [ref=f24e62]:
+              - paragraph [ref=f24e63]
+            - generic [aria-hidden]:
+              - generic: Type / to use slash commands
+          - generic [ref=f24e65]:
+            - button "Attach" [ref=f24e67] [cursor=pointer]
+            - generic [ref=f24e72]:
+              - 'button "Model: Fast" [ref=f24e74] [cursor=pointer]':
+                - generic [ref=f24e75]: Fast
+              - button "Submit" [disabled] [ref=f24e81] [cursor=pointer]:
+                - generic [ref=f24e87]: Type a message to send
+    - contentinfo:
+      - generic [ref=f24e88]:
+        - generic [ref=f24e89]:
+          - text: By messaging Grok, you agree to our
+          - link "Terms" [ref=f24e90] [cursor=pointer]:
+            - /url: https://x.ai/legal/terms-of-service
+          - text: and
+          - link "Privacy Policy" [ref=f24e91] [cursor=pointer]:
+            - /url: https://x.ai/legal/privacy-policy
+          - text: .
+        - button "Your privacy choices" [ref=f24e92] [cursor=pointer]
+        - status [ref=f24e93]
+  - region "Notifications alt+T"
+  - status [ref=f24e94]
+  - alert [ref=f24e95]
+  - alert [ref=f24e96]
