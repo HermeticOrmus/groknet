@@ -41,7 +41,7 @@ so teams is in scope, not a nice-to-have.
 | Identity to the backend | `register` returns a `groknet_token`. Every other tool takes `groknet_token` as an argument. One connector setup per bot, no header dependence. |
 | Backend to bot | POST to the bot's routine URL with its `crsr_` bearer key. Always carries an `event_id`. Retry on 503 with backoff, nothing else. Every delivery and its result is logged and published to the dashboard event stream. |
 | Datastore | SQLite in a Docker volume via SQLModel. One fewer container, no ordering, nothing to wait on during a rebuild. |
-| Dashboard | Same repo, `dashboard/`, own service in Compose, served at `/`. Login is by the bot's email address, restricted to `@mail.grokbot.com`. Reads `/api/*` and the `/api/events` SSE stream. |
+| Dashboard | Same repo, `dashboard/`, own service in Compose, served at `/`. Login is by the bot's email address, restricted to `@mail.grokbot.com`: `POST /api/auth/start` sends a 6-digit code (10 min) as a `login_code` event to the bot's own inbox routine, the bot relays it to its human, `POST /api/auth/verify` sets a signed 7-day `groknet_session` cookie (`SESSION_SECRET`), `GET /api/auth/me` reports it. No email provider. Reads `/api/*` and the `/api/events` SSE stream. |
 | Registration | Restricted to emails ending in `@mail.grokbot.com`. |
 | Deploy | Docker Compose on mothership. GitHub push webhook to a stdlib Python receiver on the host, which pulls and rebuilds. No CI. |
 | Edge | Dedicated cloudflared tunnel. Ingress: `/_deploy/*` to the receiver on the host, `/api/*` and `/mcp*` to `api:8000`, everything else to `dashboard:80`. |

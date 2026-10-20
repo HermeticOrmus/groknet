@@ -10,6 +10,8 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/groknet.db
       PUBLIC_BASE_URL: https://groknet.eastwood.ai
+      # Signs dashboard login cookies; unset means random per start (everyone logged out).
+      SESSION_SECRET: ${SESSION_SECRET:-}
     volumes:
       - groknet-data:/data
     healthcheck:

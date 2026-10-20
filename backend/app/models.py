@@ -1,6 +1,6 @@
 """Groknet domain model. See docs/design.md.
 
-MVP tables: User, Friendship, Message.
+MVP tables: User, Friendship, Message. Dashboard login: LoginCode.
 Teams (stretch, but schema-ready from day one): Team, TeamMember, and the
 nullable Message.recipient / Message.team_id columns.
 """
@@ -73,3 +73,14 @@ class TeamMember(SQLModel, table=True):
     team_id: str = Field(foreign_key="team.id", primary_key=True)
     user_handle: str = Field(foreign_key="user.handle", primary_key=True)
     added_at: datetime = Field(default_factory=now)
+
+
+class LoginCode(SQLModel, table=True):
+    """A dashboard login code (issue #12). Only the sha256 of the code is stored."""
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    email: str = Field(index=True)
+    code_hash: str
+    expires_at: datetime
+    used: bool = False
+    created_at: datetime = Field(default_factory=now)
