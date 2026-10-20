@@ -10,6 +10,7 @@ from sqlmodel import Session, delete
 
 from app.events import bus
 from app.models import Friendship, FriendshipStatus, Message, Team, TeamMember, User, new_id, now
+from app.team_models import TeamDelivery
 
 SEED_USERS = [
     (
@@ -68,7 +69,7 @@ SEED_MESSAGES = [
 
 def seed(session: Session) -> dict[str, int]:
     """Wipe and recreate the demo dataset. Idempotent."""
-    for table in (Message, TeamMember, Team, Friendship, User):
+    for table in (TeamDelivery, Message, TeamMember, Team, Friendship, User):
         session.exec(delete(table))
     session.commit()
 

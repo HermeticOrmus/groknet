@@ -15,6 +15,7 @@ Other features call `deliver(...)` and must not re-implement it.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
@@ -42,9 +43,14 @@ async def deliver(
     sender: User,
     payload: dict[str, Any],
     event_id: str | None = None,
+    on_result: Callable[[dict[str, Any]], None] | None = None,
 ) -> bool:
     """POST one event to `recipient`'s inbox routine. Returns True only when the bot
-    accepted it (HTTP 200 with {"success": true}). Never raises on delivery failure."""
+    accepted it (HTTP 200 with {"success": true}). Never raises on delivery failure.
+
+    A feature may provide on_result to persist and publish an enriched receipt.
+    Without that hook the existing global delivery event is published unchanged.
+    """
     event_id = event_id or new_event_id()
     event = {
         "event_id": event_id,
@@ -87,16 +93,18 @@ async def deliver(
             if attempt < len(RETRY_BACKOFF_S):
                 await asyncio.sleep(RETRY_BACKOFF_S[attempt])
 
-    bus.publish(
-        {
-            "type": "delivery",
-            "event_id": event_id,
-            "event_type": event_type,
-            "to": recipient.handle,
-            "ok": ok,
-            "status": status,
-        }
-    )
+    receipt = {
+        "type": "delivery",
+        "event_id": event_id,
+        "event_type": event_type,
+        "to": recipient.handle,
+        "ok": ok,
+        "status": status,
+    }
+    if on_result is not None:
+        on_result(receipt)
+    else:
+        bus.publish(receipt)
     return ok
 
 

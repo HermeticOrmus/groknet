@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Python backend checks; no provider calls or production data.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+lint=NOT_RUN
+build=NOT_RUN
+smoke=NOT_RUN
+# No static type checker is configured in this repository. Runtime DTO contracts
+# are checked by the REST/MCP tests; do not claim compilation is type checking.
+trap 'printf "PROVE typecheck=NA lint=%s build=%s smoke=%s\n" "$lint" "$build" "$smoke"' EXIT
+if [[ ! -x backend/.venv/bin/python || ! -x backend/.venv/bin/ruff ]]; then
+  echo 'Install the locked dev environment first: cd backend && uv sync --frozen --python 3.13' >&2
+  exit 1
+fi
+lint=FAIL
+(cd backend && .venv/bin/ruff check .)
+git diff --check
+lint=PASS
+build=FAIL
+backend/.venv/bin/python -m compileall -q backend/app
+build=PASS
+smoke=FAIL
+(cd backend && .venv/bin/pytest -q)
+smoke=PASS
