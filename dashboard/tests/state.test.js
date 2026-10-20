@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ChannelStore, connectionsFor, relationshipFor, mergeReceipts,
-  deliverySummary, handoffPrompt, mentionParts } from '../public/assets/state.js';
+  deliverySummary, handoffPrompt, mentionParts, reconnectDelay } from '../public/assets/state.js';
 
 test('accepted friendships are undirected, deduplicated, and viewer scoped', () => {
   const rows = [
@@ -76,4 +76,9 @@ test('handoff preserves exact team ID and explicit mentions separately from body
   const prompt = handoffPrompt({ id: 'abc', name: 'Research' }, 'Ask @someone about @tomas', ['tomas']);
   assert.match(prompt, /team_id: "abc"/);
   assert.match(prompt, /bare handles: \["tomas"\]/);
+});
+
+test('reconnect backoff doubles from one second and caps at eight', () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 9].map(reconnectDelay), [1000, 2000, 4000, 8000, 8000, 8000]);
+  assert.equal(reconnectDelay(undefined), 1000);
 });

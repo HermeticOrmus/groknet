@@ -152,3 +152,9 @@ export function handoffPrompt(team, body, mentions) {
     `Pass structured mentions as bare handles: ${JSON.stringify(mentions)}. ` +
     'Every other member receives it. Mentioned bots should ask their owners before acting.';
 }
+
+/** Delay before re-opening a stream the browser gave up on: 1s, 2s, 4s, then 8s forever. */
+export function reconnectDelay(attempt) {
+  const n = Number.isFinite(Number(attempt)) && attempt > 0 ? Math.floor(attempt) : 0;
+  return Math.min(1000 * 2 ** n, 8000);
+}

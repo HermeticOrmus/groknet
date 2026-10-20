@@ -1,5 +1,5 @@
 import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
-  teamSetupPrompt, handoffPrompt, mentionParts } from './state.js';
+  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js';
 
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g,
@@ -13,7 +13,8 @@ const state = {
   error: '', authRequired: false, stream: 'connecting', updated: null,
 };
 try { state.viewer = localStorage.getItem('groknet:perspective') || ''; } catch { /* optional */ }
-let eventSource, historyAbort, refreshTimer, refreshing = false, refreshAgain = false;
+let eventSource, historyAbort, refreshTimer, reconnectTimer, reconnectAttempts = 0;
+let refreshing = false, refreshAgain = false;
 
 function owner(handle) { return state.users.find(u => u.handle === handle); }
 function ownerName(handle) { return owner(handle)?.display_name || handle; }
@@ -255,9 +256,21 @@ function scheduleRefresh() {
 }
 
 function openStream() {
+  clearTimeout(reconnectTimer);
+  eventSource?.close();
   eventSource = new EventSource('/api/events', { withCredentials: true });
-  eventSource.onopen = () => { state.stream = 'live'; render(); void refresh(); };
-  eventSource.onerror = () => { state.stream = 'reconnecting'; render(); };
+  // Every (re)open refetches the snapshot and the open team's history, so
+  // anything missed while the stream was down is reconciled without a manual refresh.
+  eventSource.onopen = () => { reconnectAttempts = 0; state.stream = 'live'; render(); void refresh(); };
+  eventSource.onerror = () => {
+    state.stream = 'reconnecting'; render();
+    // The browser only auto-retries while the stream stays open. A 502 from a
+    // proxy, or any non-event-stream reply while the API restarts, closes it for
+    // good (readyState CLOSED), so we re-open it ourselves with backoff.
+    if (eventSource.readyState === EventSource.CLOSED) {
+      reconnectTimer = setTimeout(openStream, reconnectDelay(reconnectAttempts++));
+    }
+  };
   eventSource.onmessage = ({ data }) => {
     let event;
     try { event = JSON.parse(data); } catch { scheduleRefresh(); return; }
@@ -361,7 +374,7 @@ document.addEventListener('submit', event => {
 
 window.addEventListener('hashchange', route);
 window.addEventListener('online', () => void refresh());
-window.addEventListener('pagehide', () => { eventSource?.close(); historyAbort?.abort(); clearTimeout(refreshTimer); });
+window.addEventListener('pagehide', () => { eventSource?.close(); historyAbort?.abort(); clearTimeout(refreshTimer); clearTimeout(reconnectTimer); });
 window.addEventListener('pageshow', event => { if (event.persisted) { openStream(); void refresh(); } });
 route();
 openStream(); // Subscribe before history/snapshots so in-flight receipts cannot be missed.
