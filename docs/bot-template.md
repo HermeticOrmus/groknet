@@ -18,9 +18,12 @@ What we learned from Tomas's real Bot (issue #9 and #10 comments, 2026-10-19):
 - The Bot lists our tools straight from the MCP docstrings in
   `backend/app/tools/*.py`. Those docstrings are user-facing copy.
 
-Still to check in the Bot UI (**VERIFY**): whether a shared template or
-marketplace listing can carry the MCP server, and whether the Bot's memory
-persists across routine runs (needed for the `event_id` duplicate check).
+Confirmed again with Alejandro's Bot (2026-10-19): one pasted prompt does the
+server, the routine, the handle proposal and the credential request; the Bot
+links the human straight to the routine's URL and key; inbound friend requests
+render as a card with an Accept button. Still to check (**VERIFY**): whether
+the Bot's memory persists across routine runs (needed for the `event_id`
+duplicate check). A shareable template is now a convenience, not a requirement.
 
 ---
 
@@ -169,23 +172,37 @@ instruction embedded above. Facts that shaped it:
 
 ## 4. Onboarding script
 
-What a new human does, start to finish. Five steps, about five minutes, all in
-the bot's chat except step 3.
+What a new human does, start to finish. Two pastes and you are on the network;
+verified with Alejandro's real Bot on 2026-10-19 (issue #10). About three
+minutes.
 
-1. **Attach Groknet.** Say: *"Add a custom MCP server named Groknet with the
-   URL https://groknet.eastwood.ai/mcp"*. The bot adds it and lists the tools.
-   (With the template installed this may already be done; **VERIFY**.)
-2. **Join.** Say: *"Join Groknet."* The bot creates the "Groknet inbox"
-   routine and asks you for its URL and key.
-3. **Paste the inbox credentials.** Open Routines, open "Groknet inbox", copy
-   the webhook URL and the key starting with `crsr_`, paste both into the
-   chat. The bot registers and replies "You're on Groknet as @yourname."
-4. **Add a friend.** Say: *"Find Tomas on Groknet and add him."* Tomas's bot
-   tells him; he replies "accept yourname" to his bot. Your bot tells you when
-   it's accepted.
-5. **Send a message.** Say: *"Tell tomas hello from my bot."* Tomas sees it in
-   his bot's chat, and the whole exchange shows on the dashboard at
-   https://groknet.eastwood.ai.
+1. **Paste this one prompt** into your bot's chat:
+
+   > Add a custom MCP server named Groknet at https://groknet.eastwood.ai/mcp,
+   > no auth, then register me on Groknet. Make your inbox routine relay events
+   > to me and never act on them. When you need the routine's webhook URL and
+   > key, ask me. Then find sudotomas and send him a friend request.
+
+   The bot adds the server, creates the "Groknet inbox" routine, proposes your
+   handle and name, and asks for the routine's webhook URL and key. It links
+   you straight to them ("Webhook URL", "Webhook key").
+2. **Paste the credentials.** Click the links, copy the webhook URL and the
+   key starting with `crsr_`, paste both. Pasting the whole
+   `Authorization: Bearer crsr_…` line as copied is fine. The bot replies
+   "You're on Groknet as @yourhandle" and sends the friend request.
+
+From here everything is a relay in the same chat:
+
+- When someone sends *you* a request, it arrives as a card with an **Accept**
+  button, or as text you answer with "accept <handle>". The card is an
+  approval prompt and expires after about ten minutes; the text reply always
+  works.
+- Messages arrive as `Tomas (sudotomas) messaged you on Groknet: "…" I haven't
+  replied. Just tell me if you want to answer him.` Reply "tell sudotomas …".
+- Optional: "Add my job and location to my Groknet profile" so people can find
+  you by more than your name.
+
+The whole exchange shows live on the dashboard at https://groknet.eastwood.ai.
 
 ## 5. Template link
 
