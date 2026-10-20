@@ -1,8 +1,9 @@
 import { ChannelStore, connectionsFor, relationshipFor, deliverySummary,
-  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020d';
+  teamSetupPrompt, handoffPrompt, mentionParts, reconnectDelay } from './state.js?v=20261020e';
 import { ISSUE_STATUSES, STATUS_LABELS, escapeHtml, resolveTheme, groupIssues, issueCountSummary,
-  statusMoves, issuePatch, safeUrl, renderMarkdown, visibleProjects, errorDetail,
-  issueFormModel, mentionChoices, issueSubmission, assignmentChip, applyIssueResponse } from './projects.js?v=20261020d';
+  statusMoves, issuePatch, safeUrl, visibleProjects, errorDetail,
+  issueFormModel, mentionChoices, issueSubmission, assignmentChip, applyIssueResponse } from './projects.js?v=20261020e';
+import { renderMarkdownInto } from './markdown.js?v=20261020e';
 
 const $ = selector => document.querySelector(selector);
 const escape = escapeHtml;
@@ -225,9 +226,23 @@ function issueCard(issue, write) {
     ${write ? `<div class="card-moves">${statusMoves(issue.status).map(([to, label]) => `<button type="button" class="button small" data-move="${escape(issue.id)}" data-status="${to}" ${disabledIf(state.busy)}>${label}${to === 'done' ? ' ✓' : ''}</button>`).join('')}</div>` : ''}</article>`;
 }
 
+// Markdown artifacts whose raw source is showing instead of the rendered preview.
+const artifactSourceViews = new Set();
+
 function artifactBody(a) {
-  if (a.kind === 'markdown') return `<div class="markdown">${renderMarkdown(a.content)}</div>`;
+  if (a.kind === 'markdown' && !artifactSourceViews.has(a.id)) {
+    return `<div class="markdown" data-markdown-artifact="${escape(a.id)}"><p class="markdown-note">Rendering…</p></div>`;
+  }
   return `<pre class="artifact-text">${escape(a.content)}</pre>`;
+}
+
+/** Fill rendered-markdown placeholders; cached results land synchronously, before paint. */
+function hydrateMarkdown() {
+  const theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  for (const el of document.querySelectorAll('[data-markdown-artifact]')) {
+    const artifact = state.project?.artifacts.find(a => a.id === el.dataset.markdownArtifact);
+    if (artifact) void renderMarkdownInto(el, artifact.content, { theme });
+  }
 }
 
 function artifactsSection(p, write) {
@@ -244,10 +259,14 @@ function artifactsSection(p, write) {
     ${list.map(a => {
       const open = state.artifactId === a.id;
       const url = a.kind === 'url' ? safeUrl(a.content) : '';
+      const markdown = a.kind === 'markdown';
+      const source = artifactSourceViews.has(a.id);
       const title = a.kind === 'url' ? (url ? `<a class="artifact-title" href="${escape(url)}" rel="noopener noreferrer" target="_blank">${escape(a.title)} ↗</a>` : `<span class="artifact-title">${escape(a.title)}</span>`) :
+        markdown ? `<span class="artifact-title">${escape(a.title)}</span>` :
         `<button type="button" class="artifact-title" data-artifact="${escape(a.id)}" aria-expanded="${open}">${escape(a.title)}</button>`;
-      return `<article class="artifact"><div class="artifact-head">${title}${pill(a.kind)}<span class="meta">by ${escape(ownerName(a.created_by))} · ${escape(time(a.created_at))}</span></div>
-        ${a.kind === 'url' ? `<p class="meta">${escape(a.content)}</p>` : open ? artifactBody(a) : ''}</article>`;
+      const sourceToggle = markdown ? `<button type="button" class="button small quiet" data-artifact-source="${escape(a.id)}" aria-pressed="${source}">${source ? 'Show preview' : 'Show source'}</button>` : '';
+      return `<article class="artifact"><div class="artifact-head">${title}${pill(a.kind)}${sourceToggle}<span class="meta">by ${escape(ownerName(a.created_by))} · ${escape(time(a.created_at))}</span></div>
+        ${a.kind === 'url' ? `<p class="meta">${escape(a.content)}</p>` : markdown || open ? artifactBody(a) : ''}</article>`;
     }).join('')}${form}</section>`;
 }
 
@@ -369,6 +388,7 @@ function render() {
   if (!state.ready) main.innerHTML = state.error ? empty(state.authRequired ? 'Sign-in required' : 'Cannot load the workroom', state.error,
     `<div class="button-row" style="justify-content:center">${state.authRequired ? '<button class="button primary" type="button" data-action="sign-in">Sign in</button>' : ''}<button class="button" type="button" data-action="refresh">Try again</button></div>`) : '<div class="loading-state"><span class="loading-dot"></span>Loading the workroom…</div>';
   else main.innerHTML = state.page === 'projects' ? state.projectId ? projectPage() : projectsPage() : state.page === 'teams' ? state.teamId ? channelPage() : teamsPage() : connectionsPage();
+  hydrateMarkdown();
   const notice = $('#error-notice');
   notice.hidden = !state.error || !state.ready;
   notice.textContent = state.error;
@@ -679,6 +699,7 @@ document.addEventListener('click', async event => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     applyTheme(next);
     try { localStorage.setItem('groknet:theme', next); } catch { /* optional */ }
+    hydrateMarkdown(); // diagrams follow the theme
   }
   if (action === 'sign-in') openSignIn();
   if (action === 'close-signin') $('#signin-dialog').close();
@@ -693,6 +714,11 @@ document.addEventListener('click', async event => {
   if (action === 'create-issue') openIssueDialog();
   if (action === 'close-issue-dialog') $('#issue-dialog').close();
   if (artifact) { state.artifactId = state.artifactId === artifact ? '' : artifact; render(); }
+  if (button.dataset.artifactSource) {
+    const id = button.dataset.artifactSource;
+    if (!artifactSourceViews.delete(id)) artifactSourceViews.add(id);
+    render();
+  }
   if (action === 'show-artifact-form') { state.artifactForm = true; render(); document.querySelector('[data-focus="na-title"]')?.focus(); }
   if (action === 'hide-artifact-form') { state.artifactForm = false; delete state.drafts['new-artifact']; delete state.formErrors['new-artifact']; render(); }
   if (action === 'retry-projects') { state.projectsLoaded = false; render(); void loadProjects(); }
