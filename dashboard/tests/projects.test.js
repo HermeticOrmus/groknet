@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTheme, groupIssues, issueCountSummary, statusMoves, issuePatch, safeUrl,
-  renderMarkdown, visibleProjects, errorDetail } from '../public/assets/projects.js';
+  renderMarkdown, visibleProjects, errorDetail, issueFormModel, mentionChoices, issueSubmission } from '../public/assets/projects.js';
 
 test('theme: stored toggle choice wins, dark otherwise', () => {
   assert.equal(resolveTheme('light'), 'light');
@@ -42,6 +42,35 @@ test('issue patch sends only changed fields; empty assignee clears with null', (
   assert.deepEqual(issuePatch(original, { title: ' Ship it ', status: 'done', assignee: '', mentions: ['a'] }),
     { title: 'Ship it', status: 'done', assignee: null, mentions: ['a'] });
   assert.deepEqual(issuePatch({ ...original, assignee: null }, { assignee: 'tomas' }), { assignee: 'tomas' });
+});
+
+test('issue form model: blanks for create, the issue values for edit', () => {
+  assert.deepEqual(issueFormModel(), { title: '', description: '', status: 'open', assignee: '', mentions: [] });
+  assert.deepEqual(issueFormModel({ title: 'Ship', description: null, status: 'done', assignee: null, mentions: ['a', 'a', 'b'] }),
+    { title: 'Ship', description: '', status: 'done', assignee: '', mentions: ['a', 'b'] });
+  assert.equal(issueFormModel({ title: 'x', status: 'blocked' }).status, 'open');
+});
+
+test('mention choices skip the actor but keep anyone already mentioned', () => {
+  assert.deepEqual(mentionChoices(['tomas', 'juan', 'ana'], 'tomas'), ['juan', 'ana']);
+  assert.deepEqual(mentionChoices(['tomas', 'juan'], 'tomas', ['tomas', 'juan']), ['juan', 'tomas']);
+  assert.deepEqual(mentionChoices(undefined, 'tomas'), []);
+});
+
+test('create submission sends only filled fields and sets a non-open status afterwards', () => {
+  assert.deepEqual(issueSubmission({ title: ' Ship ', description: '  ', status: 'open', assignee: '', mentions: [] }),
+    { body: { title: 'Ship' }, status: '' });
+  assert.deepEqual(issueSubmission({ title: 'Ship', description: ' Notes ', status: 'in_progress', assignee: 'juan', mentions: ['ana', 'ana'] }),
+    { body: { title: 'Ship', description: 'Notes', assignee: 'juan', mentions: ['ana'] }, status: 'in_progress' });
+  assert.deepEqual(issueSubmission({ title: '   ' }), { error: 'Add a title.' });
+});
+
+test('edit submission is the issuePatch of changed fields, empty when unchanged', () => {
+  const original = { title: 'Ship', description: 'd', status: 'open', assignee: 'juan', mentions: ['ana'] };
+  assert.deepEqual(issueSubmission(issueFormModel(original), original), { patch: {} });
+  assert.deepEqual(issueSubmission({ ...issueFormModel(original), title: 'Ship it', status: 'done', assignee: '' }, original),
+    { patch: { title: 'Ship it', status: 'done', assignee: null } });
+  assert.deepEqual(issueSubmission({ ...issueFormModel(original), title: '' }, original), { error: 'Add a title.' });
 });
 
 test('only http(s) URLs are linkable', () => {
