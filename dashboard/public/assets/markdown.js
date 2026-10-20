@@ -32,7 +32,9 @@ const PURIFY_CONFIG = {
     'blockquote', 'ul', 'ol', 'li', 'input', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'img', 'span'],
   ALLOWED_ATTR: ['href', 'title', 'alt', 'src', 'rel', 'target', 'class', 'type', 'checked', 'disabled', 'align',
     'start', 'loading', 'referrerpolicy'],
-  ALLOWED_URI_REGEXP: /^https?:\/\//i,
+  // No ALLOWED_URI_REGEXP: DOMPurify also tests plain attribute values (checked="", loading="lazy")
+  // against it. DOMPurify's default already blocks javascript:/data:, and the hook below narrows
+  // href and src to http(s).
   ALLOW_DATA_ATTR: false,
   ALLOW_ARIA_ATTR: false,
 };
