@@ -49,6 +49,11 @@ class PatchIssue(BaseModel):
     mentions: list[str] | None = None
 
 
+class RespondToIssue(BaseModel):
+    accept: bool
+    comment: str = ""
+
+
 class CreateArtifact(BaseModel):
     title: str
     kind: str
@@ -98,6 +103,13 @@ async def create_issue(project_id: str, data: CreateIssue, session: SessionDep, 
 @router.patch("/issues/{issue_id}")
 async def patch_issue(issue_id: str, data: PatchIssue, session: SessionDep, actor: ActorDep):
     return await projects.update_issue(session, actor, issue_id, _sent(data, ("assignee",)))
+
+
+@router.post("/issues/{issue_id}/respond")
+async def respond_to_issue(
+    issue_id: str, data: RespondToIssue, session: SessionDep, actor: ActorDep
+):
+    return await projects.respond_to_issue(session, actor, issue_id, data.accept, data.comment)
 
 
 @router.get("/projects/{project_id}/artifacts")

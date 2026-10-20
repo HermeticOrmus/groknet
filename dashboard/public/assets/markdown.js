@@ -4,7 +4,7 @@
  * never depends on it. If they cannot load, the escape-first renderer from
  * projects.js is used instead, with a short note.
  */
-import { escapeHtml, safeUrl, renderMarkdown } from './projects.js?v=20261020c';
+import { escapeHtml, safeUrl, renderMarkdown } from './projects.js?v=20261020e';
 
 export const CDN = {
   marked: 'https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.esm.js',

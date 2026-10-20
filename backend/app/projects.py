@@ -24,6 +24,8 @@ log = logging.getLogger("groknet.projects")
 PROJECT_STATUSES = ("active", "archived")
 ISSUE_STATUSES = ("open", "in_progress", "done")
 ARTIFACT_KINDS = ("markdown", "text", "url")
+ASSIGNMENT_STATUSES = ("pending", "accepted", "declined")
+MAX_RESPONSE_COMMENT = 2000
 MAX_ARTIFACT_BYTES = 50 * 1024
 
 
@@ -77,6 +79,10 @@ def issue_view(issue: Issue) -> dict[str, Any]:
         "status": issue.status,
         "assignee": issue.assignee,
         "mentions": _split(issue.mentions),
+        # Rows assigned before answers existed have no status yet: they are pending.
+        "assignment_status": (issue.assignment_status or "pending") if issue.assignee else None,
+        "assignment_comment": issue.assignment_comment if issue.assignee else None,
+        "assigned_by": issue.assigned_by if issue.assignee else None,
         "created_by": issue.created_by,
         "created_at": _ts(issue.created_at),
         "updated_at": _ts(issue.updated_at),
@@ -284,6 +290,7 @@ async def create_issue(
         mentions=",".join(_check_mentions(mentions, members)),
         created_by=actor.handle,
     )
+    _reset_assignment(issue, actor)
     session.add(issue)
     session.commit()
     session.refresh(issue)
@@ -296,6 +303,8 @@ async def create_issue(
                 "title": issue.title,
                 "status": issue.status,
                 "assignee": issue.assignee,
+                "assignment_status": view["assignment_status"],
+                "assignment_comment": view["assignment_comment"],
             },
             "project_id": project_id,
             "team_id": project.team_id,
@@ -330,6 +339,8 @@ async def update_issue(
     old_assignee, old_mentions = issue.assignee, set(_split(issue.mentions))
     for field, value in new.items():
         setattr(issue, field, value)
+    if issue.assignee != old_assignee:
+        _reset_assignment(issue, actor)
     issue.updated_at = _touch(issue.updated_at)
     session.add(issue)
     session.commit()
@@ -345,11 +356,84 @@ async def update_issue(
             "changes": changed,
             "status": issue.status,
             "assignee": issue.assignee,
+            "assignment_status": view["assignment_status"],
+            "assignment_comment": view["assignment_comment"],
         }
     )
     new_assignee = issue.assignee if issue.assignee != old_assignee else None
     new_mentions = [h for h in view["mentions"] if h not in old_mentions]
     await _notify(session, actor, issue, project, team, new_assignee, new_mentions)
+    return view
+
+
+def _reset_assignment(issue: Issue, actor: User) -> None:
+    """A new (or no) assignee starts over: no answer yet, assigned by the actor."""
+    issue.assignment_status = "pending" if issue.assignee else None
+    issue.assignment_comment = None
+    issue.assigned_by = actor.handle if issue.assignee else None
+
+
+async def respond_to_issue(
+    session: Session, actor: User, issue_id: str, accept: bool, comment: str = ""
+) -> dict[str, Any]:
+    """The assignee accepts or declines the assignment, optionally with a comment.
+    Whoever assigned it and the issue's creator hear back by webhook (never the actor)."""
+    issue = require_issue(session, issue_id)
+    if issue.assignee != actor.handle:
+        raise ProjectError("Only the issue's current assignee can accept or decline it.", 403)
+    comment = (comment or "").strip()
+    if len(comment) > MAX_RESPONSE_COMMENT:
+        raise ProjectError(f"comment must be at most {MAX_RESPONSE_COMMENT} characters.")
+    project = require_project(session, issue.project_id)
+    team = require_team(session, project.team_id)
+    issue.assignment_status = "accepted" if accept else "declined"
+    issue.assignment_comment = comment or None
+    issue.updated_at = _touch(issue.updated_at)
+    session.add(issue)
+    session.commit()
+    session.refresh(issue)
+    view = issue_view(issue)
+    bus.publish(
+        {
+            "type": "issue_response",
+            "issue_id": issue.id,
+            "project_id": project.id,
+            "team_id": project.team_id,
+            "by": actor.handle,
+            "assignment_status": issue.assignment_status,
+            "comment": issue.assignment_comment,
+        }
+    )
+    handles = dict.fromkeys(h for h in (issue.assigned_by, issue.created_by) if h)
+    recipients = [session.get(User, h) for h in handles if h != actor.handle]
+    sender = User.model_validate(actor.model_dump())
+    verb = "accepted" if accept else "declined"
+    message = f"{sender.display_name} {verb} '{issue.title}'" + (f": {comment}" if comment else "")
+    payload = {
+        "issue": {
+            "id": issue.id,
+            "title": issue.title,
+            "status": issue.status,
+            "assignment_status": issue.assignment_status,
+            "comment": issue.assignment_comment,
+        },
+        "project": {"id": project.id, "name": project.name},
+        "team": {"id": team.id, "name": team.name},
+        "message": message,
+    }
+
+    async def send_one(recipient: User) -> None:
+        try:
+            await deliver(
+                User.model_validate(recipient.model_dump()),
+                event_type="issue_response",
+                sender=sender,
+                payload=payload,
+            )
+        except Exception:  # noqa: BLE001 - a notification must never fail the write
+            log.warning("notify issue_response -> @%s failed", recipient.handle, exc_info=False)
+
+    await asyncio.gather(*(send_one(r) for r in recipients if r is not None))
     return view
 
 

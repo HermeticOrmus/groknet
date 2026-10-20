@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTheme, groupIssues, issueCountSummary, statusMoves, issuePatch, safeUrl,
-  renderMarkdown, visibleProjects, errorDetail } from '../public/assets/projects.js';
+  renderMarkdown, visibleProjects, errorDetail, issueFormModel, mentionChoices, issueSubmission,
+  assignmentChip, applyIssueResponse } from '../public/assets/projects.js';
 
 test('theme: stored toggle choice wins, dark otherwise', () => {
   assert.equal(resolveTheme('light'), 'light');
@@ -42,6 +43,35 @@ test('issue patch sends only changed fields; empty assignee clears with null', (
   assert.deepEqual(issuePatch(original, { title: ' Ship it ', status: 'done', assignee: '', mentions: ['a'] }),
     { title: 'Ship it', status: 'done', assignee: null, mentions: ['a'] });
   assert.deepEqual(issuePatch({ ...original, assignee: null }, { assignee: 'tomas' }), { assignee: 'tomas' });
+});
+
+test('issue form model: blanks for create, the issue values for edit', () => {
+  assert.deepEqual(issueFormModel(), { title: '', description: '', status: 'open', assignee: '', mentions: [] });
+  assert.deepEqual(issueFormModel({ title: 'Ship', description: null, status: 'done', assignee: null, mentions: ['a', 'a', 'b'] }),
+    { title: 'Ship', description: '', status: 'done', assignee: '', mentions: ['a', 'b'] });
+  assert.equal(issueFormModel({ title: 'x', status: 'blocked' }).status, 'open');
+});
+
+test('mention choices skip the actor but keep anyone already mentioned', () => {
+  assert.deepEqual(mentionChoices(['tomas', 'juan', 'ana'], 'tomas'), ['juan', 'ana']);
+  assert.deepEqual(mentionChoices(['tomas', 'juan'], 'tomas', ['tomas', 'juan']), ['juan', 'tomas']);
+  assert.deepEqual(mentionChoices(undefined, 'tomas'), []);
+});
+
+test('create submission sends only filled fields and sets a non-open status afterwards', () => {
+  assert.deepEqual(issueSubmission({ title: ' Ship ', description: '  ', status: 'open', assignee: '', mentions: [] }),
+    { body: { title: 'Ship' }, status: '' });
+  assert.deepEqual(issueSubmission({ title: 'Ship', description: ' Notes ', status: 'in_progress', assignee: 'juan', mentions: ['ana', 'ana'] }),
+    { body: { title: 'Ship', description: 'Notes', assignee: 'juan', mentions: ['ana'] }, status: 'in_progress' });
+  assert.deepEqual(issueSubmission({ title: '   ' }), { error: 'Add a title.' });
+});
+
+test('edit submission is the issuePatch of changed fields, empty when unchanged', () => {
+  const original = { title: 'Ship', description: 'd', status: 'open', assignee: 'juan', mentions: ['ana'] };
+  assert.deepEqual(issueSubmission(issueFormModel(original), original), { patch: {} });
+  assert.deepEqual(issueSubmission({ ...issueFormModel(original), title: 'Ship it', status: 'done', assignee: '' }, original),
+    { patch: { title: 'Ship it', status: 'done', assignee: null } });
+  assert.deepEqual(issueSubmission({ ...issueFormModel(original), title: '' }, original), { error: 'Add a title.' });
 });
 
 test('only http(s) URLs are linkable', () => {
@@ -89,4 +119,32 @@ test('error detail prefers the API text and summarises validation lists', () => 
   assert.equal(errorDetail({ detail: 'Only members can write.' }, 403), 'Only members can write.');
   assert.equal(errorDetail({ detail: [{ msg: 'field required' }] }, 422), 'field required');
   assert.equal(errorDetail(null, 401), 'Sign in to continue.');
+});
+
+test('assignment chip: none without an assignee, otherwise the answer with its tone', () => {
+  assert.equal(assignmentChip({ assignee: null, assignment_status: null }), null);
+  assert.equal(assignmentChip({ assignee: '', assignment_status: 'accepted' }), null);
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'pending' }),
+    { label: 'Awaiting answer', tone: 'attention' });
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'accepted' }),
+    { label: 'Accepted', tone: 'success' });
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'declined' }),
+    { label: 'Declined', tone: 'danger' });
+  // Older rows and unknown values read as still waiting.
+  assert.deepEqual(assignmentChip({ assignee: 'juan' }), { label: 'Awaiting answer', tone: 'attention' });
+  assert.deepEqual(assignmentChip({ assignee: 'juan', assignment_status: 'x' }), { label: 'Awaiting answer', tone: 'attention' });
+});
+
+test('issue_response patches the matching issue and leaves the rest alone', () => {
+  const project = { id: 'p1', issues: [{ id: 'a', assignee: 'juan', assignment_status: 'pending', assignment_comment: null }, { id: 'b' }] };
+  const event = { type: 'issue_response', issue_id: 'a', project_id: 'p1', assignment_status: 'declined', comment: 'No time' };
+  const next = applyIssueResponse(project, event);
+  assert.notEqual(next, project);
+  assert.deepEqual(next.issues[0], { id: 'a', assignee: 'juan', assignment_status: 'declined', assignment_comment: 'No time' });
+  assert.equal(next.issues[1], project.issues[1]);
+  assert.equal(project.issues[0].assignment_status, 'pending');
+  assert.equal(applyIssueResponse(project, { ...event, project_id: 'other' }), project);
+  assert.equal(applyIssueResponse(project, { ...event, issue_id: 'zzz' }), project);
+  assert.equal(applyIssueResponse(null, event), null);
+  assert.equal(applyIssueResponse(project, { ...event, comment: undefined }).issues[0].assignment_comment, null);
 });

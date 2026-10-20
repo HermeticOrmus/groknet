@@ -108,6 +108,11 @@ class Issue(SQLModel, table=True):
     status: str = "open"  # open | in_progress | done
     assignee: str | None = Field(default=None, foreign_key="user.handle")
     mentions: str = ""  # comma-separated member handles, like Message.mentions
+    # The assignee's answer: pending | accepted | declined, null while unassigned.
+    # Any change of assignee resets both and records who assigned it.
+    assignment_status: str | None = None
+    assignment_comment: str | None = None
+    assigned_by: str | None = Field(default=None, foreign_key="user.handle")
     created_by: str = Field(foreign_key="user.handle")
     created_at: datetime = Field(default_factory=now)
     updated_at: datetime = Field(default_factory=now)
