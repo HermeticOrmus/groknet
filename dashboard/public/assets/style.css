@@ -48,6 +48,21 @@ a.artifact-title{color:var(--green)}
 .markdown pre{overflow-x:auto;background:var(--soft);padding:10px;border-radius:5px}
 .markdown pre code{padding:0;background:none}
 .artifact-text{white-space:pre-wrap;margin-bottom:0}
+.markdown h3{font-size:16px}.markdown h4{font-size:15px}
+.markdown li+li{margin-top:2px}.markdown li>input[type=checkbox]{margin:0 6px 0 -18px;vertical-align:middle;accent-color:var(--green)}
+.markdown li:has(>input[type=checkbox]){list-style:none}
+.markdown blockquote{margin:0;padding:2px 0 2px 12px;border-left:3px solid var(--line);color:var(--sub)}
+.markdown hr{border:0;border-top:1px solid var(--line)}
+.markdown table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;font-size:12.5px}
+.markdown th,.markdown td{padding:5px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}
+.markdown th{background:var(--soft);font-weight:600}.markdown [align=center]{text-align:center}.markdown [align=right]{text-align:right}
+.markdown img{max-width:100%;height:auto;border-radius:6px}
+.markdown-note{font-size:12px;color:var(--sub)}
+.mermaid-diagram{overflow-x:auto;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:8px;text-align:center}
+.mermaid-diagram svg{max-width:100%!important;height:auto;display:inline-block}
+.mermaid-error{padding:8px 10px;border-left:3px solid var(--red);border-radius:6px;background:var(--red-bg)}
+.mermaid-error>*+*{margin-top:6px}.mermaid-error .markdown-note{color:var(--red)}
+.markdown pre.mermaid-message{white-space:pre-wrap;color:var(--red);background:none;padding:0;font-family:'DM Mono',monospace;font-size:12px}
 .inline-form{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
 .inline-form .field{margin:12px 0 8px}
 .form-grid{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:12px}
